@@ -1,0 +1,9 @@
+node_modules
+.next
+.env
+.env.local
+*.db
+*.db-journal
+drizzle/meta
+next-env.d.ts
+.wa-auth/
