@@ -77,7 +77,10 @@ export async function createSession(user: string) {
   store.set(COOKIE, makeToken(user), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // secure sólo cuando servís por HTTPS. Si entrás por http://IP:puerto sin
+    // TLS, dejá COOKIE_SECURE sin definir (o "false") o el navegador descarta la
+    // cookie y te pide login en cada navegación. Con nginx+HTTPS poné "true".
+    secure: process.env.COOKIE_SECURE === "true",
     path: "/",
     maxAge: 60 * 60 * 8, // 8 horas
   });

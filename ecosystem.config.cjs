@@ -10,7 +10,7 @@ module.exports = {
     {
       name: "gestoria",
       script: "node_modules/next/dist/bin/next",
-      args: "start -p 3000",
+      args: "start -p 3300",
       cwd: __dirname,
       instances: 1, // <- una sola. No tocar.
       exec_mode: "fork", // <- fork, no cluster. No tocar.

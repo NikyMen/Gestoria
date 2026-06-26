@@ -15,7 +15,6 @@ import {
   Phone,
   Settings2,
   RefreshCw,
-  Hash,
   Trophy,
   Save,
 } from "lucide-react";
@@ -70,6 +69,14 @@ function fmtHora(ms: number) {
 function fmtFecha(ms: number | null) {
   if (!ms) return "—";
   return new Date(ms).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// Formatea el número en grupos legibles: "5493794802188" → "+549 3794 8021 88".
+function fmtTelefono(t: string) {
+  const d = (t || "").replace(/\D/g, "");
+  if (!d) return "—";
+  const rest = d.slice(3).replace(/(.{4})/g, "$1 ").trim();
+  return `+${d.slice(0, 3)} ${rest}`.trim();
 }
 
 function iniciales(nombre: string) {
@@ -574,7 +581,7 @@ function ContactoCard({
         <Avatar nombre={c.nombre} avatar={c.avatar} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-800">{c.nombre}</p>
-          <p className="truncate text-xs text-slate-400">{c.numeroLead || `+${c.telefono}`}</p>
+          <p className="truncate text-xs text-slate-400">{fmtTelefono(c.telefono)}</p>
         </div>
         {c.noLeidos > 0 && (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-lime px-1.5 text-[11px] font-bold text-navy">
@@ -691,7 +698,7 @@ function ChatPanel({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{contacto.nombre}</p>
               <p className="flex items-center gap-1 text-xs text-slate-400">
-                <Phone className="h-3 w-3" /> +{contacto.telefono}
+                <Phone className="h-3 w-3" /> {fmtTelefono(contacto.telefono)}
               </p>
             </div>
             <button
@@ -920,8 +927,9 @@ function ConfigLead({
 
         {/* Campos no editables */}
         <div className="grid grid-cols-2 gap-2">
-          <ReadOnly label="Nº de lead" value={detalle.numeroLead || "—"} icon={<Hash className="h-3 w-3" />} />
-          <ReadOnly label="Teléfono" value={`+${detalle.telefono}`} icon={<Phone className="h-3 w-3" />} />
+          <div className="col-span-2">
+            <ReadOnly label="Teléfono" value={fmtTelefono(detalle.telefono)} icon={<Phone className="h-3 w-3" />} />
+          </div>
           <div className="col-span-2">
             <ReadOnly label="Alta" value={fmtFecha(detalle.creadoEn)} />
           </div>

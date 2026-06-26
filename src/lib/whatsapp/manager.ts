@@ -19,7 +19,7 @@ import {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
 } from "baileys";
-import { eq, asc, and, sql } from "drizzle-orm";
+import { eq, asc, and, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { waContactos, waEtapas, waMensajes } from "@/db/schema";
 
@@ -319,20 +319,27 @@ class WhatsAppManager extends EventEmitter {
 
   // Foto de perfil del contacto (URL de WhatsApp). La privacidad puede bloquearla
   // → devolvemos "" y la card cae a las iniciales.
-  private async fetchAvatar(jid: string): Promise<string> {
-    try {
-      const url = await this.sock?.profilePictureUrl(jid, "image");
-      return url || "";
-    } catch {
-      return "";
+  private async fetchAvatar(jid: string, telefono?: string): Promise<string> {
+    // Probamos el jid del chat y, si falla (típico en cuentas @lid), el jid
+    // derivado del número real. La privacidad puede bloquearla → "".
+    const intentos = [jid];
+    if (telefono) intentos.push(`${telefono}@s.whatsapp.net`);
+    for (const j of intentos) {
+      try {
+        const url = await this.sock?.profilePictureUrl(j, "image");
+        if (url) return url;
+      } catch {
+        /* probar siguiente */
+      }
     }
+    return "";
   }
 
   // Refresca la foto de un contacto a pedido (botón en la config del lead).
   async refreshAvatar(contactoId: number): Promise<string> {
     const [c] = await db.select().from(waContactos).where(eq(waContactos.id, contactoId));
     if (!c) return "";
-    const avatar = await this.fetchAvatar(c.jid);
+    const avatar = await this.fetchAvatar(c.jid, c.telefono);
     const [upd] = await db
       .update(waContactos)
       .set({ avatar })
@@ -396,11 +403,15 @@ class WhatsAppManager extends EventEmitter {
     // Para @lid usamos el jid alternativo (número real) si está disponible.
     const telefono = (data.telefonoJid || jid).split("@")[0].split(":")[0];
 
-    // Upsert del contacto (card del kanban)
-    const [existente] = await db
-      .select()
-      .from(waContactos)
-      .where(eq(waContactos.jid, jid));
+    // Upsert del contacto (card del kanban). Buscamos por jid O por teléfono:
+    // un mismo contacto puede aparecer con jids distintos (@s.whatsapp.net en
+    // los salientes, @lid en algunos entrantes), pero el número real es el
+    // mismo. Sólo cruzamos por teléfono si lo conocemos (evita fusionar
+    // contactos sin número).
+    const condicion = telefono
+      ? or(eq(waContactos.jid, jid), eq(waContactos.telefono, telefono))
+      : eq(waContactos.jid, jid);
+    const [existente] = await db.select().from(waContactos).where(condicion);
 
     let contactoRow: typeof waContactos.$inferSelect;
     if (existente) {
@@ -420,7 +431,7 @@ class WhatsAppManager extends EventEmitter {
           ? data.pushName
           : existente.nombre;
       // Si todavía no tenemos foto, intentamos traerla ahora.
-      const avatar = existente.avatar || (await this.fetchAvatar(jid));
+      const avatar = existente.avatar || (await this.fetchAvatar(jid, telefono));
       const [upd] = await db
         .update(waContactos)
         .set({
@@ -444,13 +455,15 @@ class WhatsAppManager extends EventEmitter {
         .select({ n: sql<number>`count(*)` })
         .from(waContactos)
         .where(etapa ? eq(waContactos.etapaId, etapa.id) : sql`1=1`);
-      const avatar = await this.fetchAvatar(jid);
+      const avatar = await this.fetchAvatar(jid, telefono);
       const [ins] = await db
         .insert(waContactos)
         .values({
           jid,
           telefono,
-          nombre: data.pushName || telefono,
+          // Sólo los entrantes traen el nombre real del contacto. En los
+          // salientes el pushName es el del dueño de la cuenta → usamos el nº.
+          nombre: (!data.fromMe && data.pushName) ? data.pushName : telefono,
           avatar,
           etapaId: etapa?.id ?? null,
           orden: Number(n) || 0,
