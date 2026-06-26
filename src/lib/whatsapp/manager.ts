@@ -368,14 +368,21 @@ class WhatsAppManager extends EventEmitter {
     const texto = extractText(m.message) || placeholders[tipo] || "";
     if (!texto) return; // mensaje de protocolo / reacción → ignorar
 
-    // En cuentas LID el número de teléfono real llega en un campo alternativo.
+    const fromMe = !!m.key?.fromMe;
+    // Número real de la OTRA parte. `remoteJidAlt` es el alterno del chat (la
+    // otra parte, sin importar dirección). `senderPn`/`participantAlt` refieren
+    // al REMITENTE: en un saliente el remitente sos vos, así que sólo los
+    // usamos cuando el mensaje es entrante (si no, el contacto se guardaría con
+    // TU número y los entrantes nunca matchearían).
     const altJid: string | undefined =
-      m.key?.remoteJidAlt || m.key?.senderPn || m.key?.participantAlt;
+      m.key?.remoteJidAlt || (!fromMe ? m.key?.senderPn || m.key?.participantAlt : undefined);
 
-    console.log(`[whatsapp] mensaje de ${jid} fromMe=${!!m.key.fromMe} tipo=${tipo}`);
+    console.log(
+      `[whatsapp] entrante fromMe=${fromMe} tipo=${tipo} remoteJid=${jid} alt=${altJid ?? "-"} key=${JSON.stringify(m.key)}`
+    );
 
     await this.persist(jid, {
-      fromMe: !!m.key.fromMe,
+      fromMe,
       texto,
       tipo,
       ts: Number(m.messageTimestamp) || Math.floor(Date.now() / 1000),
