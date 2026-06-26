@@ -45,6 +45,7 @@ const statements = [
     total REAL NOT NULL DEFAULT 0,
     estado TEXT NOT NULL DEFAULT 'completada',
     canal TEXT NOT NULL DEFAULT 'local',
+    medio_pago TEXT NOT NULL DEFAULT 'efectivo',
     facturada INTEGER NOT NULL DEFAULT 0,
     fecha INTEGER DEFAULT (strftime('%s','now'))
   )`,
@@ -152,6 +153,7 @@ const alters = [
   `ALTER TABLE wa_contactos ADD COLUMN notas TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE wa_contactos ADD COLUMN responsable_id INTEGER REFERENCES usuarios(id)`,
   `ALTER TABLE wa_etapas ADD COLUMN es_exito INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE ventas ADD COLUMN medio_pago TEXT NOT NULL DEFAULT 'efectivo'`,
 ];
 
 // Etapas por defecto del kanban (se siembran solo si la tabla está vacía)

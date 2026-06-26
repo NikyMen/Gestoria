@@ -45,6 +45,7 @@ export const ventas = sqliteTable("ventas", {
   total: real("total").notNull().default(0),
   estado: text("estado").notNull().default("completada"), // completada | pendiente | cancelada
   canal: text("canal").notNull().default("local"), // local | online
+  medioPago: text("medio_pago").notNull().default("efectivo"), // efectivo | qr | tarjeta
   facturada: integer("facturada", { mode: "boolean" }).notNull().default(false),
   fecha: integer("fecha", { mode: "timestamp" }).default(now),
 });

@@ -1,7 +1,7 @@
 "use server";
 
-import { db, productos, clientes, compras } from "@/db";
-import { eq } from "drizzle-orm";
+import { db, productos, clientes, compras, ventas, ventaItems } from "@/db";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
   generarDescripcionProducto,
@@ -89,6 +89,59 @@ export async function crearCliente(formData: FormData) {
     direccion: String(formData.get("direccion") || ""),
   });
   revalidatePath("/clientes");
+}
+
+// --- Caja (punto de venta) ---------------------------------------------------
+type ItemCaja = { productoId: number; cantidad: number };
+export type MedioPago = "efectivo" | "qr" | "tarjeta";
+const MEDIOS_PAGO: MedioPago[] = ["efectivo", "qr", "tarjeta"];
+
+// Cierra un pedido de caja: registra la venta + ítems y descuenta stock.
+// Devuelve el id y total para mostrar el ticket sin recargar.
+export async function cobrarVenta(items: ItemCaja[], medioPago: MedioPago = "efectivo") {
+  const limpios = items.filter((i) => i.cantidad > 0);
+  if (limpios.length === 0) return { ok: false as const, error: "El pedido está vacío." };
+
+  // Traemos los productos involucrados para fijar precio y validar stock.
+  const ids = limpios.map((i) => i.productoId);
+  const prods = await db.select().from(productos).where(sql`${productos.id} in ${ids}`);
+  const byId = new Map(prods.map((p) => [p.id, p]));
+
+  for (const it of limpios) {
+    const p = byId.get(it.productoId);
+    if (!p) return { ok: false as const, error: "Hay un producto que ya no existe." };
+    if (p.stock < it.cantidad)
+      return { ok: false as const, error: `Sin stock suficiente de "${p.nombre}" (quedan ${p.stock}).` };
+  }
+
+  const total = limpios.reduce((a, it) => a + (byId.get(it.productoId)!.precioVenta * it.cantidad), 0);
+
+  const medio = MEDIOS_PAGO.includes(medioPago) ? medioPago : "efectivo";
+
+  const [venta] = await db
+    .insert(ventas)
+    .values({ total, estado: "completada", canal: "local", medioPago: medio })
+    .returning({ id: ventas.id });
+
+  for (const it of limpios) {
+    const p = byId.get(it.productoId)!;
+    await db.insert(ventaItems).values({
+      ventaId: venta.id,
+      productoId: p.id,
+      cantidad: it.cantidad,
+      precioUnit: p.precioVenta,
+    });
+    await db
+      .update(productos)
+      .set({ stock: Math.max(0, p.stock - it.cantidad) })
+      .where(eq(productos.id, p.id));
+  }
+
+  revalidatePath("/caja");
+  revalidatePath("/ventas");
+  revalidatePath("/stock");
+  revalidatePath("/");
+  return { ok: true as const, ventaId: venta.id, total };
 }
 
 // --- Compras -----------------------------------------------------------------

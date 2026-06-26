@@ -3,6 +3,7 @@
 
 export type ModuloKey =
   | "panel"
+  | "caja"
   | "stock"
   | "ventas"
   | "compras"
@@ -15,6 +16,7 @@ export type ModuloKey =
 
 export const MODULOS: { key: ModuloKey; label: string; href: string }[] = [
   { key: "panel", label: "Panel", href: "/" },
+  { key: "caja", label: "Caja", href: "/caja" },
   { key: "stock", label: "Stock", href: "/stock" },
   { key: "ventas", label: "Ventas", href: "/ventas" },
   { key: "compras", label: "Compras", href: "/compras" },
