@@ -7,3 +7,5 @@ node_modules
 drizzle/meta
 next-env.d.ts
 .wa-auth/
+# Artefactos de build (los regenera `pnpm build`; no deben versionarse)
+*.tsbuildinfo
