@@ -31,6 +31,8 @@ import {
   cerrarSesion,
   abrirChat,
   enviarMensaje,
+  sincronizarChat,
+  sincronizarContactos,
   reordenarColumna,
   reordenarEtapas,
   crearEtapa,
@@ -136,6 +138,52 @@ export function WhatsappBoard({
   const abiertoRef = useRef<number | null>(null);
   abiertoRef.current = abierto;
   const [mensajes, setMensajes] = useState<MensajeDTO[]>([]);
+  const mensajesRef = useRef<MensajeDTO[]>([]);
+  mensajesRef.current = mensajes;
+
+  // Fusiona el estado de un contacto que llega del servidor (SSE o polling):
+  // si es nuevo lo agrega; si ya existe, sólo refresca los campos de mensajería
+  // y la foto (la posición del kanban es local, la maneja el drag). No re-renderiza
+  // si nada cambió. Si el chat está abierto, mantiene la card como leída.
+  function aplicarContacto(c: ContactoDTO) {
+    setContactos((prev) => {
+      const i = prev.findIndex((x) => x.id === c.id);
+      const noLeidos = abiertoRef.current === c.id ? 0 : c.noLeidos;
+      if (i === -1) return [...prev, { ...c, noLeidos }];
+      const cur = prev[i];
+      const next = {
+        ...cur,
+        nombre: c.nombre || cur.nombre,
+        avatar: c.avatar || cur.avatar,
+        ultimoMensaje: c.ultimoMensaje,
+        ultimoMensajeEn: c.ultimoMensajeEn,
+        noLeidos,
+      };
+      if (
+        cur.nombre === next.nombre &&
+        cur.avatar === next.avatar &&
+        cur.ultimoMensaje === next.ultimoMensaje &&
+        cur.ultimoMensajeEn === next.ultimoMensajeEn &&
+        cur.noLeidos === next.noLeidos
+      ) {
+        return prev; // sin cambios → evita re-render
+      }
+      const copy = [...prev];
+      copy[i] = next;
+      return copy;
+    });
+  }
+
+  // Agrega mensajes nuevos al chat abierto, deduplicando por id (sirve para SSE
+  // y para el polling de respaldo).
+  function agregarMensajes(nuevos: MensajeDTO[], contactoId: number) {
+    if (abiertoRef.current !== contactoId) return;
+    setMensajes((prev) => {
+      const ids = new Set(prev.map((x) => x.id));
+      const add = nuevos.filter((m) => !ids.has(m.id));
+      return add.length ? [...prev, ...add] : prev;
+    });
+  }
 
   // Drag & drop
   const [drag, setDrag] = useState<{ tipo: "card" | "col"; id: number } | null>(null);
@@ -148,36 +196,48 @@ export function WhatsappBoard({
     const es = new EventSource("/api/whatsapp/stream");
 
     es.addEventListener("status", (e) => setConn(JSON.parse((e as MessageEvent).data)));
-
-    es.addEventListener("contact", (e) => {
-      const c: ContactoDTO = JSON.parse((e as MessageEvent).data);
-      setContactos((prev) => {
-        const i = prev.findIndex((x) => x.id === c.id);
-        if (i === -1) return [...prev, c]; // contacto nuevo → entra en su etapa
-        // La posición (etapa/orden) y los datos del lead (responsable, nº de
-        // lead, presupuesto) los gestiona el cliente; sólo refrescamos los
-        // campos de mensajería y la foto (autoritativa del servidor).
-        const copy = [...prev];
-        copy[i] = {
-          ...copy[i],
-          nombre: c.nombre || copy[i].nombre,
-          avatar: c.avatar || copy[i].avatar,
-          ultimoMensaje: c.ultimoMensaje,
-          ultimoMensajeEn: c.ultimoMensajeEn,
-          noLeidos: c.noLeidos,
-        };
-        return copy;
-      });
-    });
-
+    es.addEventListener("contact", (e) =>
+      aplicarContacto(JSON.parse((e as MessageEvent).data) as ContactoDTO)
+    );
     es.addEventListener("message", (e) => {
       const m: MensajeDTO = JSON.parse((e as MessageEvent).data);
-      if (abiertoRef.current === m.contactoId) {
-        setMensajes((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-      }
+      agregarMensajes([m], m.contactoId);
     });
 
     return () => es.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Polling de respaldo: garantiza consistencia aunque el SSE pierda un
+  // evento (proxy/buffering/reconexión). Reconcilia contactos y, si hay un chat
+  // abierto, trae sus mensajes nuevos por id. Barato para un CRM de pocos leads.
+  useEffect(() => {
+    let vivo = true;
+    const tick = async () => {
+      try {
+        const lista = await sincronizarContactos();
+        if (vivo) lista.forEach(aplicarContacto);
+      } catch {
+        /* reintenta en el próximo tick */
+      }
+      const id = abiertoRef.current;
+      if (id != null) {
+        try {
+          const reales = mensajesRef.current.filter((m) => m.id > 0).map((m) => m.id);
+          const desde = reales.length ? Math.max(...reales) : 0;
+          const nuevos = await sincronizarChat(id, desde);
+          if (vivo && nuevos.length) agregarMensajes(nuevos, id);
+        } catch {
+          /* reintenta en el próximo tick */
+        }
+      }
+    };
+    const t = setInterval(tick, 4000);
+    return () => {
+      vivo = false;
+      clearInterval(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- Conexión -------------------------------------------------------------
@@ -203,6 +263,36 @@ export function WhatsappBoard({
     setContactos((prev) => prev.map((c) => (c.id === id ? { ...c, noLeidos: 0 } : c)));
     const msgs = await abrirChat(id);
     if (abiertoRef.current === id) setMensajes(msgs);
+  }
+
+  // Envío optimista: mostramos el mensaje al instante (id temporal negativo) y
+  // lo reconciliamos cuando el servidor responde. Si falla, lo quitamos. Así no
+  // se percibe la latencia del ACK de WhatsApp ni de la persistencia.
+  async function enviarDesdeChat(contactoId: number, texto: string) {
+    const tempId = -Date.now();
+    const optimista: MensajeDTO = {
+      id: tempId,
+      contactoId,
+      desdeMi: true,
+      texto,
+      tipo: "texto",
+      timestamp: Date.now(),
+    };
+    setMensajes((prev) => [...prev, optimista]);
+    const res = await enviarMensaje(contactoId, texto);
+    if (abiertoRef.current !== contactoId) {
+      // El usuario cambió de chat; el SSE/polling reflejará el resultado.
+      return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+    }
+    if (res.ok) {
+      setMensajes((prev) => {
+        const sinTemp = prev.filter((m) => m.id !== tempId);
+        return sinTemp.some((m) => m.id === res.mensaje.id) ? sinTemp : [...sinTemp, res.mensaje];
+      });
+      return { ok: true as const };
+    }
+    setMensajes((prev) => prev.filter((m) => m.id !== tempId));
+    return { ok: false as const, error: res.error };
   }
 
   // --- Helpers de estado de cards -------------------------------------------
@@ -453,9 +543,7 @@ export function WhatsappBoard({
             setAbierto(null);
             setConfigAbierta(false);
           }}
-          onEnviado={(m) =>
-            setMensajes((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]))
-          }
+          onEnviar={(t) => enviarDesdeChat(contactoAbierto.id, t)}
         />
       )}
     </div>
@@ -625,7 +713,7 @@ function ChatPanel({
   onPatch,
   onColocar,
   onClose,
-  onEnviado,
+  onEnviar,
 }: {
   contacto: ContactoDTO;
   mensajes: MensajeDTO[];
@@ -638,7 +726,7 @@ function ChatPanel({
   onPatch: (patch: Partial<ContactoDTO>) => void;
   onColocar: (etapaId: number) => void;
   onClose: () => void;
-  onEnviado: (m: MensajeDTO) => void;
+  onEnviar: (texto: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -655,13 +743,12 @@ function ChatPanel({
     if (!t || enviando) return;
     setEnviando(true);
     setError(null);
-    const res = await enviarMensaje(contacto.id, t);
+    setTexto(""); // optimista: limpiamos el input de inmediato
+    const res = await onEnviar(t);
     setEnviando(false);
-    if (res.ok) {
-      setTexto("");
-      onEnviado(res.mensaje);
-    } else {
+    if (!res.ok) {
       setError(res.error);
+      setTexto(t); // restauramos el texto si el envío falló
     }
   }
 

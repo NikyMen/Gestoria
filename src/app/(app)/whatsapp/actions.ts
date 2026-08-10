@@ -8,11 +8,12 @@ import {
   waPresupuestos,
   waPresupuestoItems,
 } from "@/db/schema";
-import { eq, asc, desc, gt, sql } from "drizzle-orm";
+import { eq, and, asc, desc, gt, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
   getManager,
   toMensajeDTO,
+  toContactoDTO,
   type DetalleContacto,
   type PresupuestoItemInput,
 } from "@/lib/whatsapp/manager";
@@ -48,6 +49,33 @@ export async function enviarMensaje(contactoId: number, texto: string) {
   } catch (e) {
     return { ok: false as const, error: (e as Error).message };
   }
+}
+
+// --- Sincronización (red de seguridad sobre el SSE) --------------------------
+// El SSE empuja los mensajes en vivo, pero si un evento se pierde (proxy,
+// reconexión, buffering), estas dos acciones reconcilian por polling para que
+// NUNCA se pierda un mensaje ni una respuesta entrante.
+
+// Mensajes del chat abierto con id mayor a `desdeId` (incremental y barato).
+export async function sincronizarChat(contactoId: number, desdeId: number) {
+  const rows = await db
+    .select()
+    .from(waMensajes)
+    .where(and(eq(waMensajes.contactoId, contactoId), gt(waMensajes.id, desdeId)))
+    .orderBy(asc(waMensajes.id));
+  return rows.map(toMensajeDTO);
+}
+
+// Snapshot liviano de contactos (para detectar respuestas que llegan a otras
+// cards y contactos nuevos). El cliente fusiona sólo los campos de mensajería,
+// preservando la posición local del kanban.
+export async function sincronizarContactos() {
+  const rows = await db
+    .select()
+    .from(waContactos)
+    .orderBy(asc(waContactos.id));
+  const conPres = await idsConPresupuesto();
+  return rows.map((c) => toContactoDTO(c, conPres.has(c.id)));
 }
 
 // --- Kanban: mover / reordenar cards -----------------------------------------
