@@ -22,6 +22,18 @@ export function FacturasTabla({ facturas }: { facturas: Factura[] }) {
       rowKey={(f) => f.id}
       search={(f) => `${f.numero} ${f.cliente ?? "consumidor final"} ${f.tipo} ${f.estado} ${f.total}`}
       searchPlaceholder="Buscar por comprobante, cliente, estado, total…"
+      mobileCard={(f) => (
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{f.cliente ?? "Consumidor final"}</p>
+            <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">
+              {f.numero} · Tipo {f.tipo} · {fecha(f.fecha)}
+            </p>
+            <div className="mt-1"><Estado value={f.estado} /></div>
+          </div>
+          <span className="shrink-0 text-sm font-semibold tabular-nums">{money(f.total)}</span>
+        </div>
+      )}
     />
   );
 }

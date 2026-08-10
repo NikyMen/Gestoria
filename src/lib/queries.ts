@@ -111,11 +111,19 @@ export async function getMetricas() {
 export const recientes = {
   ventas: () =>
     db
-      .select({ id: ventas.id, total: ventas.total, estado: ventas.estado, canal: ventas.canal, fecha: ventas.fecha, cliente: clientes.nombre })
+      .select({
+        id: ventas.id,
+        total: ventas.total,
+        estado: ventas.estado,
+        canal: ventas.canal,
+        medioPago: ventas.medioPago,
+        fecha: ventas.fecha,
+        cliente: clientes.nombre,
+      })
       .from(ventas)
       .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
-      .orderBy(desc(ventas.fecha))
-      .limit(20),
+      .orderBy(desc(ventas.id))
+      .limit(50),
   facturas: () =>
     db
       .select({ id: facturas.id, numero: facturas.numero, total: facturas.total, tipo: facturas.tipo, estado: facturas.estado, fecha: facturas.fecha, cliente: clientes.nombre })

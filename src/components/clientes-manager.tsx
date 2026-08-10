@@ -41,6 +41,16 @@ export function ClientesManager({ items }: { items: Cliente[] }) {
         rowKey={(c) => c.id}
         search={(c) => `${c.nombre} ${c.email} ${c.telefono} ${c.cuit} ${c.direccion}`}
         searchPlaceholder="Buscar cliente por nombre, email, CUIT…"
+        mobileCard={(c) => (
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{c.nombre}</p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">{c.email || "sin email"}</p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {c.telefono || "sin teléfono"}
+              {c.cuit ? ` · CUIT ${c.cuit}` : ""}
+            </p>
+          </div>
+        )}
       />
     </>
   );

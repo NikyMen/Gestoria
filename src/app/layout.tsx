@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -18,6 +18,16 @@ export const metadata: Metadata = {
   description:
     "Gestioná ventas, compras, stock, clientes y facturación. La IA transforma tus productos en contenido listo para vender.",
   icons: { icon: "/brand/favicon.png" },
+};
+
+// viewportFit: "cover" habilita env(safe-area-inset-*) → necesario para que la
+// barra inferior no quede tapada por el gesto/notch en iPhone.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0c1015",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

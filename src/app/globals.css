@@ -28,14 +28,25 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* El fondo animado es fixed: el body nunca debe desbordar en horizontal */
+  overflow-x: hidden;
 }
 
 h1, h2, h3, .font-display {
   font-family: var(--font-display);
 }
 
+/* Área segura del gesto/notch en iPhone (requiere viewportFit: "cover") */
+@utility safe-b {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility safe-mb {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Card semitransparente: deja entrever el fondo animado sin perder legibilidad */
 @utility card {
-  @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  @apply rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm backdrop-blur-[3px];
 }
 
 @utility btn {
@@ -48,8 +59,9 @@ h1, h2, h3, .font-display {
   @apply btn border border-slate-200 bg-white text-slate-700 hover:bg-slate-50;
 }
 
+/* text-base en mobile: con menos de 16px iOS hace zoom al enfocar el input */
 @utility input {
-  @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
+  @apply w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100 sm:py-2 sm:text-sm;
 }
 
 @utility label {
@@ -58,4 +70,22 @@ h1, h2, h3, .font-display {
 
 @utility badge {
   @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+/* Tecla del atajo, en el modal de cobro */
+@utility kbd {
+  @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-slate-300 bg-slate-50 px-1 font-mono text-[11px] font-semibold text-slate-500;
+}
+
+/* Tooltip en hover/focus. Se usa junto a `group` en el contenedor. */
+@utility tip {
+  @apply pointer-events-none absolute z-50 hidden w-56 rounded-lg bg-navy px-3 py-2 text-xs font-normal leading-snug text-slate-200 shadow-lg group-hover:block group-focus-within:block;
+}
+
+/* Diálogo: hoja desde abajo en mobile, centrado en escritorio */
+@utility overlay {
+  @apply fixed inset-0 z-50 flex items-end justify-center bg-navy/40 backdrop-blur-[2px] sm:items-center sm:p-4;
+}
+@utility sheet {
+  @apply max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-xl safe-b sm:max-w-lg sm:rounded-2xl;
 }

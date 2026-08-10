@@ -14,7 +14,12 @@ export type ModuloKey =
   | "ia"
   | "equipo";
 
-export const MODULOS: { key: ModuloKey; label: string; href: string }[] = [
+export type Modulo = { key: ModuloKey; label: string; href: string; oculto?: boolean };
+
+// `oculto` saca el módulo de los menús y de los permisos asignables, pero NO
+// desactiva la ruta ni el backend: /whatsapp y /tienda siguen funcionando si se
+// entra por URL. Volver a mostrarlos = borrar la línea `oculto: true`.
+export const MODULOS: Modulo[] = [
   { key: "panel", label: "Panel", href: "/" },
   { key: "caja", label: "Caja", href: "/caja" },
   { key: "stock", label: "Stock", href: "/stock" },
@@ -22,14 +27,16 @@ export const MODULOS: { key: ModuloKey; label: string; href: string }[] = [
   { key: "compras", label: "Compras", href: "/compras" },
   { key: "clientes", label: "Clientes", href: "/clientes" },
   { key: "facturacion", label: "Facturación", href: "/facturacion" },
-  { key: "tienda", label: "Tienda online", href: "/tienda" },
-  { key: "whatsapp", label: "WhatsApp", href: "/whatsapp" },
+  { key: "tienda", label: "Tienda online", href: "/tienda", oculto: true },
+  { key: "whatsapp", label: "WhatsApp", href: "/whatsapp", oculto: true },
   { key: "ia", label: "Asistente IA", href: "/ia" },
   { key: "equipo", label: "Equipo", href: "/equipo" },
 ];
 
-// Permisos típicos para un miembro nuevo (el equipo suele manejar WhatsApp y stock)
-export const PERMISOS_DEFAULT: ModuloKey[] = ["whatsapp", "stock"];
+export const MODULOS_VISIBLES = MODULOS.filter((m) => !m.oculto);
+
+// Permisos típicos para un miembro nuevo (el mostrador: caja y stock)
+export const PERMISOS_DEFAULT: ModuloKey[] = ["caja", "stock"];
 
 // Forma del usuario en sesión que circula por la app (sin datos sensibles)
 export type UsuarioActual = {
@@ -59,9 +66,10 @@ export function tieneAcceso(u: UsuarioActual | null, modulo: ModuloKey): boolean
   return u.permisos.includes(modulo);
 }
 
-// A dónde mandar al usuario cuando no tiene acceso al módulo pedido.
+// A dónde mandar al usuario cuando no tiene acceso al módulo pedido. Se buscan
+// solo módulos visibles: no tiene sentido aterrizar en uno oculto del menú.
 export function primerModuloPermitido(u: UsuarioActual): string {
   if (u.rol === "admin") return "/";
-  const m = MODULOS.find((x) => u.permisos.includes(x.key));
+  const m = MODULOS_VISIBLES.find((x) => u.permisos.includes(x.key));
   return m?.href ?? "/login";
 }

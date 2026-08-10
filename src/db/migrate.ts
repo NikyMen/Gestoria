@@ -10,7 +10,7 @@ function hashPassword(pass: string): string {
 }
 
 const MODULOS = [
-  "panel", "stock", "ventas", "compras", "clientes",
+  "panel", "caja", "stock", "ventas", "compras", "clientes",
   "facturacion", "tienda", "whatsapp", "ia", "equipo",
 ];
 
@@ -46,6 +46,7 @@ const statements = [
     estado TEXT NOT NULL DEFAULT 'completada',
     canal TEXT NOT NULL DEFAULT 'local',
     medio_pago TEXT NOT NULL DEFAULT 'efectivo',
+    referencia TEXT NOT NULL DEFAULT '',
     facturada INTEGER NOT NULL DEFAULT 0,
     fecha INTEGER DEFAULT (strftime('%s','now'))
   )`,
@@ -60,8 +61,34 @@ const statements = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     proveedor TEXT NOT NULL DEFAULT '',
     total REAL NOT NULL DEFAULT 0,
-    estado TEXT NOT NULL DEFAULT 'recibida',
+    estado TEXT NOT NULL DEFAULT 'pedido',
+    imagen TEXT NOT NULL DEFAULT '',
+    detalle TEXT NOT NULL DEFAULT '',
     fecha INTEGER DEFAULT (strftime('%s','now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS compra_historial (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    compra_id INTEGER NOT NULL REFERENCES compras(id),
+    usuario_id INTEGER REFERENCES usuarios(id),
+    usuario_nombre TEXT NOT NULL DEFAULT '',
+    campo TEXT NOT NULL DEFAULT '',
+    antes TEXT NOT NULL DEFAULT '',
+    despues TEXT NOT NULL DEFAULT '',
+    creado_en INTEGER DEFAULT (strftime('%s','now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS ia_conversaciones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER REFERENCES usuarios(id),
+    titulo TEXT NOT NULL DEFAULT 'Nueva conversación',
+    creado_en INTEGER DEFAULT (strftime('%s','now')),
+    actualizado_en INTEGER DEFAULT (strftime('%s','now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS ia_mensajes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversacion_id INTEGER NOT NULL REFERENCES ia_conversaciones(id),
+    rol TEXT NOT NULL DEFAULT 'user',
+    texto TEXT NOT NULL DEFAULT '',
+    creado_en INTEGER DEFAULT (strftime('%s','now'))
   )`,
   `CREATE TABLE IF NOT EXISTS compra_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -152,8 +179,19 @@ const alters = [
   `ALTER TABLE wa_contactos ADD COLUMN email TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE wa_contactos ADD COLUMN notas TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE wa_contactos ADD COLUMN responsable_id INTEGER REFERENCES usuarios(id)`,
+  `ALTER TABLE wa_contactos ADD COLUMN lid TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE wa_etapas ADD COLUMN es_exito INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE ventas ADD COLUMN medio_pago TEXT NOT NULL DEFAULT 'efectivo'`,
+  `ALTER TABLE ventas ADD COLUMN referencia TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE compras ADD COLUMN imagen TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE compras ADD COLUMN detalle TEXT NOT NULL DEFAULT ''`,
+];
+
+// Índices que importan para las listas más consultadas
+const indices = [
+  `CREATE INDEX IF NOT EXISTS idx_ia_mensajes_conv ON ia_mensajes(conversacion_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_ia_conv_usuario ON ia_conversaciones(usuario_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_compra_hist_compra ON compra_historial(compra_id)`,
 ];
 
 // Etapas por defecto del kanban (se siembran solo si la tabla está vacía)
@@ -179,6 +217,14 @@ async function migrate() {
       /* la columna ya existe → ignorar */
     }
   }
+
+  for (const sql of indices) {
+    await client.execute(sql);
+  }
+
+  // Estados viejos de compras → nuevo flujo de control
+  await client.execute("UPDATE compras SET estado = 'pedido' WHERE estado = 'pendiente'");
+  await client.execute("UPDATE compras SET estado = 'verificado' WHERE estado = 'recibida'");
 
   // Sembrar etapas del kanban de WhatsApp si aún no existen
   const { rows } = await client.execute("SELECT COUNT(*) AS n FROM wa_etapas");

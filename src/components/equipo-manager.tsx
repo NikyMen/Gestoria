@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MODULOS, PERMISOS_DEFAULT, type ModuloKey } from "@/lib/permisos";
+import { MODULOS, MODULOS_VISIBLES, PERMISOS_DEFAULT, type ModuloKey } from "@/lib/permisos";
 import {
   crearUsuario,
   actualizarUsuario,
@@ -191,7 +191,7 @@ export function EquipoManager({ items }: { items: UsuarioRow[] }) {
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {MODULOS.filter((m) => m.key !== "equipo").map((m) => (
+                {MODULOS_VISIBLES.filter((m) => m.key !== "equipo").map((m) => (
                   <label
                     key={m.key}
                     className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"

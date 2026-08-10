@@ -9,3 +9,5 @@ next-env.d.ts
 .wa-auth/
 # Artefactos de build (los regenera `pnpm build`; no deben versionarse)
 *.tsbuildinfo
+# Comprobantes subidos desde la app (Compras) — se sirven por /api/uploads
+/uploads

@@ -1,8 +1,11 @@
 "use server";
 
 import { db, productos, clientes, compras, ventas, ventaItems } from "@/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { descontarStock } from "@/lib/stock";
+import { MEDIOS_PAGO, type MedioPago } from "@/lib/medios-pago";
+import { esEstadoCompra } from "@/lib/compras";
 import {
   generarDescripcionProducto,
   generarPublicacionRedes,
@@ -11,38 +14,35 @@ import {
 import { getContextoNegocio } from "@/lib/queries";
 
 // --- Productos ---------------------------------------------------------------
+// Campos comunes a los formularios de alta y edición de producto.
+function datosProducto(fd: FormData) {
+  return {
+    nombre: String(fd.get("nombre") || "").trim(),
+    sku: String(fd.get("sku") || ""),
+    categoria: String(fd.get("categoria") || "General"),
+    precioVenta: Number(fd.get("precioVenta") || 0),
+    precioCompra: Number(fd.get("precioCompra") || 0),
+    stock: Number(fd.get("stock") || 0),
+    stockMinimo: Number(fd.get("stockMinimo") || 5),
+  };
+}
+
 export async function crearProducto(formData: FormData) {
-  const nombre = String(formData.get("nombre") || "").trim();
-  if (!nombre) return;
+  const d = datosProducto(formData);
+  if (!d.nombre) return;
   await db.insert(productos).values({
-    sku: String(formData.get("sku") || `SKU-${Date.now()}`),
-    nombre,
-    categoria: String(formData.get("categoria") || "General"),
+    ...d,
+    sku: d.sku || `SKU-${Date.now()}`,
     descripcion: String(formData.get("descripcion") || ""),
-    precioVenta: Number(formData.get("precioVenta") || 0),
-    precioCompra: Number(formData.get("precioCompra") || 0),
-    stock: Number(formData.get("stock") || 0),
-    stockMinimo: Number(formData.get("stockMinimo") || 5),
   });
   revalidatePath("/stock");
   revalidatePath("/");
 }
 
 export async function editarProducto(id: number, formData: FormData) {
-  const nombre = String(formData.get("nombre") || "").trim();
-  if (!nombre) return;
-  await db
-    .update(productos)
-    .set({
-      nombre,
-      sku: String(formData.get("sku") || ""),
-      categoria: String(formData.get("categoria") || "General"),
-      precioVenta: Number(formData.get("precioVenta") || 0),
-      precioCompra: Number(formData.get("precioCompra") || 0),
-      stock: Number(formData.get("stock") || 0),
-      stockMinimo: Number(formData.get("stockMinimo") || 5),
-    })
-    .where(eq(productos.id, id));
+  const d = datosProducto(formData);
+  if (!d.nombre) return;
+  await db.update(productos).set(d).where(eq(productos.id, id));
   revalidatePath("/stock");
   revalidatePath("/");
   revalidatePath("/tienda");
@@ -55,19 +55,19 @@ export async function eliminarProducto(id: number) {
 }
 
 export async function ajustarStock(id: number, delta: number) {
-  const [p] = await db.select().from(productos).where(eq(productos.id, id));
-  if (!p) return;
+  // Update atómico: no lee antes de escribir, así dos ajustes concurrentes no se pisan.
   await db
     .update(productos)
-    .set({ stock: Math.max(0, p.stock + delta) })
+    .set({ stock: sql`max(0, ${productos.stock} + ${delta})` })
     .where(eq(productos.id, id));
   revalidatePath("/stock");
 }
 
 export async function togglePublicado(id: number) {
-  const [p] = await db.select().from(productos).where(eq(productos.id, id));
-  if (!p) return;
-  await db.update(productos).set({ publicado: !p.publicado }).where(eq(productos.id, id));
+  await db
+    .update(productos)
+    .set({ publicado: sql`not ${productos.publicado}` })
+    .where(eq(productos.id, id));
   revalidatePath("/tienda");
   revalidatePath("/stock");
 }
@@ -93,18 +93,21 @@ export async function crearCliente(formData: FormData) {
 
 // --- Caja (punto de venta) ---------------------------------------------------
 type ItemCaja = { productoId: number; cantidad: number };
-export type MedioPago = "efectivo" | "qr" | "tarjeta";
-const MEDIOS_PAGO: MedioPago[] = ["efectivo", "qr", "tarjeta"];
 
 // Cierra un pedido de caja: registra la venta + ítems y descuenta stock.
 // Devuelve el id y total para mostrar el ticket sin recargar.
-export async function cobrarVenta(items: ItemCaja[], medioPago: MedioPago = "efectivo") {
+// `opts` lo usa el alta manual desde Ventas (cliente y canal); la Caja no lo pasa.
+export async function cobrarVenta(
+  items: ItemCaja[],
+  medioPago: MedioPago = "efectivo",
+  opts?: { clienteId?: number | null; canal?: string }
+) {
   const limpios = items.filter((i) => i.cantidad > 0);
   if (limpios.length === 0) return { ok: false as const, error: "El pedido está vacío." };
 
   // Traemos los productos involucrados para fijar precio y validar stock.
   const ids = limpios.map((i) => i.productoId);
-  const prods = await db.select().from(productos).where(sql`${productos.id} in ${ids}`);
+  const prods = await db.select().from(productos).where(inArray(productos.id, ids));
   const byId = new Map(prods.map((p) => [p.id, p]));
 
   for (const it of limpios) {
@@ -120,22 +123,24 @@ export async function cobrarVenta(items: ItemCaja[], medioPago: MedioPago = "efe
 
   const [venta] = await db
     .insert(ventas)
-    .values({ total, estado: "completada", canal: "local", medioPago: medio })
+    .values({
+      total,
+      estado: "completada",
+      canal: opts?.canal === "online" ? "online" : "local",
+      medioPago: medio,
+      clienteId: opts?.clienteId ?? null,
+    })
     .returning({ id: ventas.id });
 
-  for (const it of limpios) {
-    const p = byId.get(it.productoId)!;
-    await db.insert(ventaItems).values({
+  await db.insert(ventaItems).values(
+    limpios.map((it) => ({
       ventaId: venta.id,
-      productoId: p.id,
+      productoId: it.productoId,
       cantidad: it.cantidad,
-      precioUnit: p.precioVenta,
-    });
-    await db
-      .update(productos)
-      .set({ stock: Math.max(0, p.stock - it.cantidad) })
-      .where(eq(productos.id, p.id));
-  }
+      precioUnit: byId.get(it.productoId)!.precioVenta,
+    }))
+  );
+  await descontarStock(limpios);
 
   revalidatePath("/caja");
   revalidatePath("/ventas");
@@ -148,10 +153,12 @@ export async function cobrarVenta(items: ItemCaja[], medioPago: MedioPago = "efe
 export async function crearCompra(formData: FormData) {
   const proveedor = String(formData.get("proveedor") || "").trim();
   if (!proveedor) return;
+  const estado = String(formData.get("estado") || "pedido");
   await db.insert(compras).values({
     proveedor,
     total: Number(formData.get("total") || 0),
-    estado: String(formData.get("estado") || "recibida"),
+    estado: esEstadoCompra(estado) ? estado : "pedido",
+    detalle: String(formData.get("detalle") || ""),
   });
   revalidatePath("/compras");
   revalidatePath("/");

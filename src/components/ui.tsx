@@ -24,7 +24,10 @@ const estilos: Record<string, string> = {
   completada: "bg-emerald-50 text-emerald-700",
   pagada: "bg-emerald-50 text-emerald-700",
   recibida: "bg-emerald-50 text-emerald-700",
+  verificado: "bg-emerald-50 text-emerald-700",
   pendiente: "bg-amber-50 text-amber-700",
+  pedido: "bg-amber-50 text-amber-700",
+  falta_controlar: "bg-blue-50 text-blue-700",
   emitida: "bg-blue-50 text-blue-700",
   cancelada: "bg-rose-50 text-rose-700",
   anulada: "bg-rose-50 text-rose-700",
@@ -32,8 +35,19 @@ const estilos: Record<string, string> = {
   local: "bg-slate-100 text-slate-600",
 };
 
+// Slugs de la DB que se muestran distinto a como se guardan.
+const etiquetas: Record<string, string> = {
+  falta_controlar: "Falta controlar",
+  pedido: "Pedido",
+  verificado: "Verificado",
+};
+
 export function Estado({ value }: { value: string }) {
-  return <span className={`badge ${estilos[value] ?? "bg-slate-100 text-slate-600"}`}>{value}</span>;
+  return (
+    <span className={`badge ${estilos[value] ?? "bg-slate-100 text-slate-600"}`}>
+      {etiquetas[value] ?? value}
+    </span>
+  );
 }
 
 export function Table({ head, children }: { head: string[]; children: React.ReactNode }) {

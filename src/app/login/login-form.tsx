@@ -24,7 +24,7 @@ export function LoginForm() {
           autoComplete="username"
           required
           placeholder="Tu usuario"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500 focus:border-lime focus:ring-2 focus:ring-lime/30"
+          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-lime focus:ring-2 focus:ring-lime/30 sm:py-2 sm:text-sm"
         />
       </div>
       <div>
@@ -35,7 +35,7 @@ export function LoginForm() {
           autoComplete="current-password"
           required
           placeholder="••••••••"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500 focus:border-lime focus:ring-2 focus:ring-lime/30"
+          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-lime focus:ring-2 focus:ring-lime/30 sm:py-2 sm:text-sm"
         />
       </div>
 

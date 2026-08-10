@@ -45,7 +45,9 @@ export const ventas = sqliteTable("ventas", {
   total: real("total").notNull().default(0),
   estado: text("estado").notNull().default("completada"), // completada | pendiente | cancelada
   canal: text("canal").notNull().default("local"), // local | online
-  medioPago: text("medio_pago").notNull().default("efectivo"), // efectivo | qr | tarjeta
+  medioPago: text("medio_pago").notNull().default("efectivo"), // efectivo | qr | tarjeta | mercadopago
+  // Id del pago en la pasarela (MercadoPago) para conciliación/idempotencia.
+  referencia: text("referencia").notNull().default(""),
   facturada: integer("facturada", { mode: "boolean" }).notNull().default(false),
   fecha: integer("fecha", { mode: "timestamp" }).default(now),
 });
@@ -65,8 +67,27 @@ export const compras = sqliteTable("compras", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   proveedor: text("proveedor").notNull().default(""),
   total: real("total").notNull().default(0),
-  estado: text("estado").notNull().default("recibida"), // recibida | pendiente
+  // pedido | falta_controlar | verificado (legacy: recibida | pendiente)
+  estado: text("estado").notNull().default("pedido"),
+  // Foto del remito/factura del proveedor (ruta pública en /uploads/compras)
+  imagen: text("imagen").notNull().default(""),
+  // Detalle en texto: se puede escribir a mano o transcribir la imagen con IA
+  detalle: text("detalle").notNull().default(""),
   fecha: integer("fecha", { mode: "timestamp" }).default(now),
+});
+
+// Auditoría de cambios de una compra: quién tocó qué, cuándo y con qué valores.
+export const compraHistorial = sqliteTable("compra_historial", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  compraId: integer("compra_id").notNull().references(() => compras.id),
+  usuarioId: integer("usuario_id").references(() => usuarios.id),
+  // Snapshot del nombre: el historial tiene que seguir siendo legible aunque
+  // el usuario se dé de baja.
+  usuarioNombre: text("usuario_nombre").notNull().default(""),
+  campo: text("campo").notNull().default(""),
+  antes: text("antes").notNull().default(""),
+  despues: text("despues").notNull().default(""),
+  creadoEn: integer("creado_en", { mode: "timestamp" }).default(now),
 });
 
 export const compraItems = sqliteTable("compra_items", {
@@ -126,6 +147,10 @@ export const waEtapas = sqliteTable("wa_etapas", {
 export const waContactos = sqliteTable("wa_contactos", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   jid: text("jid").notNull().unique(), // 549111234567@s.whatsapp.net
+  // jid alterno @lid de la cuenta (WhatsApp LID). Permite matchear las
+  // respuestas entrantes que llegan como XXXX@lid con el contacto creado al
+  // enviar (que está como telefono@s.whatsapp.net). "" si no se conoce.
+  lid: text("lid").notNull().default(""),
   telefono: text("telefono").notNull().default(""),
   numeroLead: text("numero_lead").notNull().default(""), // nº de lead único (L-0001)
   nombre: text("nombre").notNull().default(""),
@@ -172,10 +197,32 @@ export const waMensajes = sqliteTable("wa_mensajes", {
   creadoEn: integer("creado_en", { mode: "timestamp" }).default(now),
 });
 
+// ---------------------------------------------------------------------------
+// Asistente IA — historial de conversaciones
+// ---------------------------------------------------------------------------
+export const iaConversaciones = sqliteTable("ia_conversaciones", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  usuarioId: integer("usuario_id").references(() => usuarios.id),
+  titulo: text("titulo").notNull().default("Nueva conversación"),
+  creadoEn: integer("creado_en", { mode: "timestamp" }).default(now),
+  actualizadoEn: integer("actualizado_en", { mode: "timestamp" }).default(now),
+});
+
+export const iaMensajes = sqliteTable("ia_mensajes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  conversacionId: integer("conversacion_id").notNull().references(() => iaConversaciones.id),
+  rol: text("rol").notNull().default("user"), // user | assistant
+  texto: text("texto").notNull().default(""),
+  creadoEn: integer("creado_en", { mode: "timestamp" }).default(now),
+});
+
 export type Producto = typeof productos.$inferSelect;
+export type IaConversacion = typeof iaConversaciones.$inferSelect;
+export type IaMensaje = typeof iaMensajes.$inferSelect;
 export type Cliente = typeof clientes.$inferSelect;
 export type Venta = typeof ventas.$inferSelect;
 export type Compra = typeof compras.$inferSelect;
+export type CompraHistorial = typeof compraHistorial.$inferSelect;
 export type Factura = typeof facturas.$inferSelect;
 export type Usuario = typeof usuarios.$inferSelect;
 export type WaEtapa = typeof waEtapas.$inferSelect;

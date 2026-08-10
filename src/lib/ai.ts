@@ -61,6 +61,71 @@ export async function generarPublicacionRedes(input: {
   return ask(system, prompt);
 }
 
+// Chat con memoria: se le manda la conversación entera para que pueda
+// encadenar preguntas ("¿y de esos cuál conviene reponer primero?").
+export async function chatNegocio(input: {
+  mensajes: { rol: string; texto: string }[];
+  contexto: string;
+}): Promise<string> {
+  const client = getClient();
+  const system =
+    "Sos un asistente de negocios integrado a un ERP argentino. Respondés sobre el comercio " +
+    "usando EXCLUSIVAMENTE los datos del contexto que sigue. Sos breve, directo y usás números " +
+    "concretos. Si el dato no está en el contexto, lo decís claramente en vez de inventarlo. " +
+    "Español rioplatense neutro.\n\nDATOS DEL NEGOCIO:\n" +
+    input.contexto;
+
+  const messages = input.mensajes
+    .filter((m) => m.texto.trim())
+    .map((m) => ({
+      role: m.rol === "assistant" ? ("assistant" as const) : ("user" as const),
+      content: m.texto,
+    }));
+  if (messages.length === 0) throw new Error("No hay ningún mensaje para responder.");
+
+  const res = await client.messages.create({ model: MODEL, max_tokens: 900, system, messages });
+  return res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n")
+    .trim();
+}
+
+// Transcripción de la foto de un remito/factura de compra.
+export async function transcribirImagen(input: {
+  base64: string;
+  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+}): Promise<string> {
+  const client = getClient();
+  const res = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1500,
+    system:
+      "Transcribís remitos y facturas de compra de un comercio. Devolvés texto plano legible, " +
+      "sin markdown ni comentarios tuyos. Si un dato no se lee, escribís (ilegible).",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: input.mediaType, data: input.base64 } },
+          {
+            type: "text",
+            text:
+              "Transcribí este comprobante de compra. Incluí, si están: proveedor, número y fecha " +
+              "del comprobante, y el listado de ítems con cantidad, precio unitario y subtotal, " +
+              "uno por línea. Cerrá con el TOTAL.",
+          },
+        ],
+      },
+    ],
+  });
+  return res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n")
+    .trim();
+}
+
 export async function consultaNegocio(input: {
   pregunta: string;
   contexto: string;
