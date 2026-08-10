@@ -32,5 +32,8 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|brand|favicon.ico).*)"],
+  // `.well-known` queda fuera a propósito: ahí es donde Let's Encrypt pide el
+  // archivo del desafío ACME para renovar el certificado. Si el middleware lo
+  // redirige a /login, la validación falla y el certificado no se renueva.
+  matcher: ["/((?!_next/static|_next/image|brand|favicon.ico|\\.well-known).*)"],
 };
