@@ -1,8 +1,17 @@
 # Deploy de GestorIA en el VPS (PM2)
 
 App Next.js 15 con WhatsApp (Baileys) embebido en el mismo proceso y base de
-datos libsql en archivo local. Por eso: **un solo proceso, fork, y dos rutas que
-deben persistir** (`.wa-auth/` y `gestoria.db`).
+datos libsql en archivo local. Por eso: **un solo proceso, fork, y tres rutas que
+deben persistir**:
+
+| Ruta | Qué guarda |
+|---|---|
+| `gestoria.db` | La base entera |
+| `.wa-auth/` | La sesión de WhatsApp (si no, hay que reescanear el QR) |
+| `uploads/` | Las fotos de los remitos de Compras |
+
+Las tres están en `.gitignore`, así que `git pull` no las toca. Si algún día
+movés la app de servidor, copiá esas tres cosas.
 
 ## Requisitos en el VPS (una vez)
 
@@ -40,8 +49,7 @@ pm2 save                 # guarda la lista de procesos
 pm2 startup              # imprime un comando -> ejecutalo para arrancar al bootear
 ```
 
-La app queda en `http://127.0.0.1:3000`. Entrás a /whatsapp, escaneás el QR una
-vez y la sesión queda guardada en `.wa-auth/`.
+La app queda en `http://127.0.0.1:3300` (el puerto lo fija `ecosystem.config.cjs`).
 
 ## Redeploys (cuando hacés cambios)
 
@@ -49,13 +57,20 @@ vez y la sesión queda guardada en `.wa-auth/`.
 cd /opt/gestoria
 git pull
 pnpm install --frozen-lockfile
-pnpm db:push        # solo si cambió el schema
+pnpm db:push        # solo si cambió el schema (es idempotente: no rompe nada)
 pnpm build
 pm2 reload gestoria
 ```
 
-> `.wa-auth/` y `gestoria.db` están (deben estar) en `.gitignore`, así que el
-> `git pull` no los toca: la sesión de WhatsApp y la base sobreviven al redeploy.
+> `db:push` solo crea lo que falta (`CREATE TABLE IF NOT EXISTS` + `ALTER`
+> tolerantes a error), así que correrlo de más no borra datos.
+
+## La cámara necesita HTTPS
+
+El escáner de código de barras de la Caja usa `getUserMedia`, que los navegadores
+solo habilitan en contexto seguro. Desde el celular hay que entrar por el dominio
+con HTTPS (ver la sección de nginx + certbot); por IP y `http://` el navegador no
+va a pedir permiso de cámara.
 
 ## Nginx (reverse proxy + HTTPS)
 
