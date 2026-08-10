@@ -74,15 +74,23 @@ va a pedir permiso de cámara.
 
 ## Nginx (reverse proxy + HTTPS)
 
-El chat usa **SSE (Server-Sent Events)**. Hay que **desactivar el buffering** de
-nginx o los mensajes en tiempo real no llegan hasta que se cierra la conexión.
+Dos cosas que si faltan rompen funcionalidad concreta:
+
+- **`proxy_buffering off`**: el chat de WhatsApp usa SSE (Server-Sent Events).
+  Con el buffering activo los mensajes no llegan hasta que se cierra la conexión.
+- **`client_max_body_size`**: el default de nginx es 1 MB y las fotos de remitos
+  de Compras admiten hasta 8 MB. Sin esto, sacar una foto con el celular
+  devuelve **413** y la subida falla.
 
 ```nginx
 server {
-    server_name tu-dominio.com;
+    server_name gestoria.consultoriadigital.io;
+
+    # Fotos de remitos: la app acepta hasta 8 MB
+    client_max_body_size 10M;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3300;   # el puerto de ecosystem.config.cjs
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -98,7 +106,13 @@ server {
 }
 ```
 
-Después: `certbot --nginx -d tu-dominio.com` para el HTTPS.
+Después `certbot --nginx -d gestoria.consultoriadigital.io` agrega el bloque 443
+con el certificado y la redirección desde http. Renueva solo (sistemd timer);
+se verifica con `certbot renew --dry-run`.
+
+> Al pasar a HTTPS hay que actualizar `NEXT_PUBLIC_BASE_URL` en el `.env` a la
+> URL final: MercadoPago la usa para las back_urls y el webhook, y con
+> `http://localhost:3000` el checkout vuelve a un lugar que no existe.
 
 ## Comandos útiles de PM2
 
