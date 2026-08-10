@@ -72,47 +72,70 @@ solo habilitan en contexto seguro. Desde el celular hay que entrar por el domini
 con HTTPS (ver la sección de nginx + certbot); por IP y `http://` el navegador no
 va a pedir permiso de cámara.
 
-## Nginx (reverse proxy + HTTPS)
+## Cómo llega el tráfico (importante)
 
-Dos cosas que si faltan rompen funcionalidad concreta:
+En este VPS conviven varios sitios y **el HTTPS no lo maneja nginx**:
 
-- **`proxy_buffering off`**: el chat de WhatsApp usa SSE (Server-Sent Events).
-  Con el buffering activo los mensajes no llegan hasta que se cierra la conexión.
-- **`client_max_body_size`**: el default de nginx es 1 MB y las fotos de remitos
-  de Compras admiten hasta 8 MB. Sin esto, sacar una foto con el celular
-  devuelve **413** y la subida falla.
+| Puerto | Quién lo tiene |
+|---|---|
+| 443 | **Traefik**, en el contenedor `n8n-traefik-1` |
+| 80 | nginx (solo redirige a https) |
+| 3300 | GestorIA, en el host vía PM2 |
+
+Traefik termina el TLS y emite/renueva los certificados solo, con el resolver
+`mytlschallenge` (desafío TLS-ALPN sobre el 443; no usa el puerto 80). Lee
+configuración dinámica de `/docker/n8n/dynamic` y la recarga sin reiniciarse.
+
+**No uses `certbot --nginx` para estos dominios.** Agrega un `listen 443 ssl` a
+nginx que nunca va a poder tomar (el puerto es de Traefik), lo que hace fallar el
+`systemctl reload nginx` y deja a nginx sin poder arrancar tras un reboot.
+
+### Publicar el sitio en Traefik
+
+`/docker/n8n/dynamic/gestoria.yml` (el `172.18.0.1` es la IP del host vista desde
+el contenedor: `docker inspect n8n-traefik-1 --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}'`):
+
+```yaml
+http:
+  routers:
+    gestoria:
+      rule: "Host(`gestoria.consultoriadigital.io`)"
+      entryPoints:
+        - websecure
+      service: gestoria
+      tls:
+        certResolver: mytlschallenge
+  services:
+    gestoria:
+      loadBalancer:
+        servers:
+          - url: "http://172.18.0.1:3300"
+```
+
+Traefik lo toma solo; no hay que reiniciar nada. Se verifica con
+`curl -sSI https://gestoria.consultoriadigital.io/login | head -3` → `HTTP/2 200`.
+
+### nginx: solo el redirect del puerto 80
+
+`/etc/nginx/sites-available/gestoria`:
 
 ```nginx
 server {
+    listen 80;
     server_name gestoria.consultoriadigital.io;
-
-    # Fotos de remitos: la app acepta hasta 8 MB
-    client_max_body_size 10M;
-
-    location / {
-        proxy_pass http://127.0.0.1:3300;   # el puerto de ecosystem.config.cjs
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # --- imprescindible para el SSE del chat ---
-        proxy_set_header Connection "";
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 3600s;
-    }
+    return 301 https://$host$request_uri;
 }
 ```
 
-Después `certbot --nginx -d gestoria.consultoriadigital.io` agrega el bloque 443
-con el certificado y la redirección desde http. Renueva solo (sistemd timer);
-se verifica con `certbot renew --dry-run`.
+### Pendiente conocido
 
-> Al pasar a HTTPS hay que actualizar `NEXT_PUBLIC_BASE_URL` en el `.env` a la
-> URL final: MercadoPago la usa para las back_urls y el webhook, y con
-> `http://localhost:3000` el checkout vuelve a un lugar que no existe.
+El proxy de Traefik hoy no fija `client_max_body_size` ni desactiva el buffering:
+
+- Las fotos de remitos de Compras llegan hasta 8 MB. Traefik no limita el body
+  por defecto, así que debería andar, pero si una subida falla revisá esto.
+- El chat de WhatsApp usa SSE. Traefik no bufferea respuestas por defecto; si los
+  mensajes en tiempo real llegaran demorados, hay que revisarlo del lado de
+  Traefik y no de nginx.
 
 ## Comandos útiles de PM2
 
