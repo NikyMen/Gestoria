@@ -1,30 +1,48 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { listTiendaProductos } from "@/lib/tienda";
 
-const MODEL = "claude-haiku-4-5-20251001"; // rápido y económico para contenido comercial
+const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
+const MODEL = process.env.DEEPSEEK_MODEL?.trim() || "deepseek-v4-flash";
 
-function getClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+export const MAX_HISTORY = 12;
+export const MAX_MESSAGE_CHARS = 500;
+
+type Message = { role: "system" | "user" | "assistant"; content: string };
+
+function apiKey(): string {
+  const key = process.env.DEEPSEEK_API_KEY?.trim();
+  if (!key) {
     throw new Error(
-      "Falta ANTHROPIC_API_KEY. Copiá .env.example a .env y agregá tu clave de Anthropic."
+      "Falta DEEPSEEK_API_KEY. Agregá tu clave de DeepSeek al archivo .env del servidor."
     );
   }
-  return new Anthropic({ apiKey });
+  return key;
 }
 
-async function ask(system: string, prompt: string, maxTokens = 1024): Promise<string> {
-  const client = getClient();
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: "user", content: prompt }],
+async function complete(messages: Message[], maxTokens = 1024): Promise<string> {
+  const res = await fetch(DEEPSEEK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey()}`,
+    },
+    body: JSON.stringify({ model: MODEL, messages, max_tokens: maxTokens, temperature: 0.7 }),
   });
-  return res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`DeepSeek rechazó la solicitud (${res.status}): ${detail}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const text = data.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error("DeepSeek devolvió una respuesta vacía.");
+  return text;
+}
+
+export function aiHabilitado(): boolean {
+  return Boolean(process.env.DEEPSEEK_API_KEY?.trim());
 }
 
 export async function generarDescripcionProducto(input: {
@@ -32,17 +50,21 @@ export async function generarDescripcionProducto(input: {
   categoria?: string;
   detalles?: string;
 }): Promise<string> {
-  const system =
-    "Sos un copywriter experto en e-commerce. Escribís descripciones de producto persuasivas, " +
-    "claras y optimizadas para vender en internet (español rioplatense neutro). " +
-    "Devolvés solo la descripción, sin títulos ni comillas.";
-  const prompt =
-    `Producto: ${input.nombre}\n` +
-    `Categoría: ${input.categoria ?? "General"}\n` +
-    `Detalles: ${input.detalles || "(sin detalles adicionales)"}\n\n` +
-    "Escribí una descripción de venta de 2-3 párrafos cortos, con beneficios concretos " +
-    "y un cierre que invite a la compra.";
-  return ask(system, prompt);
+  return complete(
+    [
+      {
+        role: "system",
+        content:
+          "Sos un copywriter experto en e-commerce. Escribís descripciones persuasivas, claras y breves en español rioplatense neutro. Devolvé solo la descripción, sin títulos ni comillas.",
+      },
+      {
+        role: "user",
+        content:
+          `Producto: ${input.nombre}\nCategoría: ${input.categoria ?? "General"}\nDetalles: ${input.detalles || "(sin detalles adicionales)"}\n\nEscribí una descripción de venta de 2-3 párrafos cortos, con beneficios concretos y un cierre que invite a la compra.`,
+      },
+    ],
+    1024
+  );
 }
 
 export async function generarPublicacionRedes(input: {
@@ -50,31 +72,26 @@ export async function generarPublicacionRedes(input: {
   red: "instagram" | "facebook" | "tiktok" | "whatsapp";
   promo?: string;
 }): Promise<string> {
-  const system =
-    "Sos community manager de un comercio. Creás publicaciones atractivas para redes sociales " +
-    "con gancho, emojis con criterio, y un llamado a la acción. Español rioplatense neutro.";
-  const prompt =
-    `Producto: ${input.nombre}\n` +
-    `Red social: ${input.red}\n` +
-    `Promoción/ángulo: ${input.promo || "destacar el producto"}\n\n` +
-    "Generá una publicación lista para copiar y pegar, con 5-8 hashtags relevantes al final.";
-  return ask(system, prompt);
+  return complete(
+    [
+      {
+        role: "system",
+        content:
+          "Sos community manager de un comercio. Creá publicaciones atractivas con gancho, emojis con criterio y llamado a la acción. Usá español rioplatense neutro.",
+      },
+      {
+        role: "user",
+        content: `Producto: ${input.nombre}\nRed social: ${input.red}\nPromoción/ángulo: ${input.promo || "destacar el producto"}\n\nGenerá una publicación lista para copiar y pegar, con 5-8 hashtags relevantes al final.`,
+      },
+    ],
+    1024
+  );
 }
 
-// Chat con memoria: se le manda la conversación entera para que pueda
-// encadenar preguntas ("¿y de esos cuál conviene reponer primero?").
 export async function chatNegocio(input: {
   mensajes: { rol: string; texto: string }[];
   contexto: string;
 }): Promise<string> {
-  const client = getClient();
-  const system =
-    "Sos un asistente de negocios integrado a un ERP argentino. Respondés sobre el comercio " +
-    "usando EXCLUSIVAMENTE los datos del contexto que sigue. Sos breve, directo y usás números " +
-    "concretos. Si el dato no está en el contexto, lo decís claramente en vez de inventarlo. " +
-    "Español rioplatense neutro.\n\nDATOS DEL NEGOCIO:\n" +
-    input.contexto;
-
   const messages = input.mensajes
     .filter((m) => m.texto.trim())
     .map((m) => ({
@@ -83,57 +100,68 @@ export async function chatNegocio(input: {
     }));
   if (messages.length === 0) throw new Error("No hay ningún mensaje para responder.");
 
-  const res = await client.messages.create({ model: MODEL, max_tokens: 900, system, messages });
-  return res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
+  return complete(
+    [
+      {
+        role: "system",
+        content:
+          "Sos un asistente de negocios integrado a un ERP argentino. Respondé exclusivamente usando el contexto. Sé breve, directo y no inventes datos.\n\nDATOS DEL NEGOCIO:\n" +
+          input.contexto,
+      },
+      ...messages,
+    ],
+    900
+  );
 }
 
-// Transcripción de la foto de un remito/factura de compra.
-export async function transcribirImagen(input: {
+export async function askDeepSeek(
+  messages: { role: "user" | "assistant"; content: string }[]
+): Promise<string> {
+  const products = await listTiendaProductos();
+  const catalog = products
+    .map(
+      (p) =>
+        `- ${p.name}: $${p.price} ${p.available && p.stock > 0 ? `(stock ${p.stock})` : "(sin stock)"}`
+    )
+    .join("\n");
+
+  return complete(
+    [
+      {
+        role: "system",
+        content:
+          "Sos el asistente virtual de una tienda online argentina. Respondé en español rioplatense, cordial y breve. Hablá solo de productos, precios, stock y compras. No inventes datos.\n\nCATÁLOGO ACTUAL:\n" +
+          catalog,
+      },
+      ...messages,
+    ],
+    700
+  );
+}
+
+export async function transcribirImagen(_input: {
   base64: string;
   mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
 }): Promise<string> {
-  const client = getClient();
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: 1500,
-    system:
-      "Transcribís remitos y facturas de compra de un comercio. Devolvés texto plano legible, " +
-      "sin markdown ni comentarios tuyos. Si un dato no se lee, escribís (ilegible).",
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: input.mediaType, data: input.base64 } },
-          {
-            type: "text",
-            text:
-              "Transcribí este comprobante de compra. Incluí, si están: proveedor, número y fecha " +
-              "del comprobante, y el listado de ítems con cantidad, precio unitario y subtotal, " +
-              "uno por línea. Cerrá con el TOTAL.",
-          },
-        ],
-      },
-    ],
-  });
-  return res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
+  throw new Error(
+    "La transcripción de imágenes no está disponible con DeepSeek. Cargá el detalle del comprobante manualmente."
+  );
 }
 
 export async function consultaNegocio(input: {
   pregunta: string;
   contexto: string;
 }): Promise<string> {
-  const system =
-    "Sos un asistente de negocios integrado a un ERP. Respondés preguntas sobre el comercio " +
-    "usando EXCLUSIVAMENTE los datos del contexto. Sos breve, directo y usás números concretos. " +
-    "Si el dato no está en el contexto, lo decís claramente.";
-  const prompt = `DATOS DEL NEGOCIO:\n${input.contexto}\n\nPREGUNTA: ${input.pregunta}`;
-  return ask(system, prompt, 700);
+  return complete(
+    [
+      {
+        role: "system",
+        content:
+          "Sos un asistente de negocios integrado a un ERP. Respondé exclusivamente usando los datos del contexto. Sé breve y no inventes datos.\n\nDATOS DEL NEGOCIO:\n" +
+          input.contexto,
+      },
+      { role: "user", content: input.pregunta },
+    ],
+    700
+  );
 }

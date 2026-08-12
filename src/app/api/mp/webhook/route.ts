@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { db, ventas, ventaItems } from "@/db";
+import { db, tiendaPedidos, ventas, ventaItems } from "@/db";
 import { obtenerPago } from "@/lib/mercadopago";
 import { descontarStock } from "@/lib/stock";
 
@@ -36,23 +36,33 @@ async function procesar(url: URL, body: MpBody): Promise<void> {
   if (!venta || venta.estado !== "pendiente") return; // idempotente: ya procesada
 
   if (pago.status === "approved") {
-    await db
+    const claimed = await db
       .update(ventas)
-      .set({ estado: "completada", referencia: paymentId })
-      .where(eq(ventas.id, ventaId));
+      .set({ estado: "procesando", referencia: paymentId })
+      .where(and(eq(ventas.id, ventaId), eq(ventas.estado, "pendiente")));
+    if (!claimed.rowsAffected) return;
 
-    // Descontar stock de cada ítem de la venta.
-    const items = await db.select().from(ventaItems).where(eq(ventaItems.ventaId, ventaId));
-    await descontarStock(items);
+    try {
+      const items = await db.select().from(ventaItems).where(eq(ventaItems.ventaId, ventaId));
+      await descontarStock(items);
+      await db.update(ventas).set({ estado: "completada" }).where(eq(ventas.id, ventaId));
+      await db.update(tiendaPedidos).set({ estadoEntrega: "en_preparacion", pagoMp: paymentId }).where(eq(tiendaPedidos.ventaId, ventaId));
+    } catch (error) {
+      await db.update(ventas).set({ estado: "cancelada" }).where(eq(ventas.id, ventaId));
+      console.error("[mp/webhook] no se pudo descontar stock:", error);
+      return;
+    }
 
     revalidatePath("/ventas");
     revalidatePath("/stock");
     revalidatePath("/");
+    revalidatePath("/tienda");
   } else if (pago.status === "rejected" || pago.status === "cancelled") {
     await db
       .update(ventas)
       .set({ estado: "cancelada", referencia: paymentId })
       .where(eq(ventas.id, ventaId));
+    await db.update(tiendaPedidos).set({ estadoEntrega: "cancelado", pagoMp: paymentId }).where(eq(tiendaPedidos.ventaId, ventaId));
   }
 }
 

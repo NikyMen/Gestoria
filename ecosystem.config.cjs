@@ -17,7 +17,7 @@ module.exports = {
       autorestart: true,
       max_memory_restart: "1G",
       // Next.js carga .env / .env.production automáticamente, así que las
-      // variables (ANTHROPIC_API_KEY, AUTH_*, etc.) van en el .env del server.
+      // variables (DEEPSEEK_API_KEY, AUTH_*, etc.) van en el .env del server.
       env: {
         NODE_ENV: "production",
       },

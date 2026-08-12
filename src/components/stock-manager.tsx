@@ -5,7 +5,7 @@ import { Sparkles, Loader2, Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-rea
 import type { Producto } from "@/db/schema";
 import { money } from "@/lib/format";
 import { FilterableTable, Col } from "@/components/filterable-table";
-import { ajustarStock, crearProducto, editarProducto, eliminarProducto, accionDescripcion } from "@/app/actions";
+import { ajustarStock, crearProducto, editarProducto, eliminarProducto, accionDescripcion, togglePublicado, toggleOfertaTienda } from "@/app/actions";
 
 export function StockManager({ items }: { items: Producto[] }) {
   const [open, setOpen] = useState(false);
@@ -45,6 +45,8 @@ export function StockManager({ items }: { items: Producto[] }) {
           <button className="btn-ghost px-2 py-1" title="Quitar 1" onClick={() => startTransition(() => ajustarStock(p.id, -1))}>−</button>
           <button className="btn-ghost px-2 py-1" title="Sumar 1" onClick={() => startTransition(() => ajustarStock(p.id, 1))}>+</button>
           <button className="btn-ghost px-2 py-1" title="Editar" onClick={() => setEditando(p)}><Pencil className="h-3.5 w-3.5" /></button>
+          <button className="btn-ghost px-2 py-1 text-xs" title={p.publicado ? "Ocultar de la tienda" : "Publicar en la tienda"} onClick={() => startTransition(() => togglePublicado(p.id))}>{p.publicado ? "Ocultar" : "Publicar"}</button>
+          <button className="btn-ghost px-2 py-1 text-xs" title="Alternar oferta" onClick={() => startTransition(() => toggleOfertaTienda(p.id))}>Oferta</button>
           <button className="btn-ghost px-2 py-1 text-rose-600" title="Eliminar" onClick={() => { if (confirm(`¿Eliminar "${p.nombre}"?`)) startTransition(() => eliminarProducto(p.id)); }}><Trash2 className="h-3.5 w-3.5" /></button>
         </div>
       ),
@@ -107,6 +109,7 @@ export function StockManager({ items }: { items: Producto[] }) {
                   <button className="btn-ghost px-2.5 py-1.5" aria-label="Editar producto" onClick={() => setEditando(p)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
+                  <button className="btn-ghost px-2.5 py-1.5 text-xs" aria-label="Publicar u ocultar en tienda" onClick={() => startTransition(() => togglePublicado(p.id))}>{p.publicado ? "Ocultar" : "Publicar"}</button>
                   <button
                     className="btn-ghost px-2.5 py-1.5 text-rose-600"
                     aria-label="Eliminar producto"

@@ -57,6 +57,32 @@ const statements = [
     cantidad INTEGER NOT NULL DEFAULT 1,
     precio_unit REAL NOT NULL DEFAULT 0
   )`,
+  `CREATE TABLE IF NOT EXISTS tienda_producto_meta (
+    producto_id INTEGER PRIMARY KEY REFERENCES productos(id),
+    precio_anterior REAL,
+    badge TEXT DEFAULT '',
+    oferta_del_dia INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS tienda_pedidos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    venta_id INTEGER NOT NULL UNIQUE REFERENCES ventas(id),
+    checkout_id TEXT NOT NULL UNIQUE,
+    nombre TEXT NOT NULL DEFAULT '',
+    telefono TEXT NOT NULL DEFAULT '',
+    direccion TEXT NOT NULL DEFAULT '',
+    franja_entrega TEXT NOT NULL DEFAULT '',
+    fecha_entrega TEXT NOT NULL DEFAULT '',
+    lat REAL,
+    lng REAL,
+    estado_entrega TEXT NOT NULL DEFAULT 'pendiente',
+    codigo_entrega TEXT NOT NULL DEFAULT '',
+    preferencia_mp TEXT NOT NULL DEFAULT '',
+    init_point_mp TEXT NOT NULL DEFAULT '',
+    pago_mp TEXT NOT NULL DEFAULT '',
+    notas TEXT NOT NULL DEFAULT '',
+    creado_en INTEGER DEFAULT (strftime('%s','now')),
+    actualizado_en INTEGER DEFAULT (strftime('%s','now'))
+  )`,
   `CREATE TABLE IF NOT EXISTS compras (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     proveedor TEXT NOT NULL DEFAULT '',
@@ -192,6 +218,8 @@ const indices = [
   `CREATE INDEX IF NOT EXISTS idx_ia_mensajes_conv ON ia_mensajes(conversacion_id)`,
   `CREATE INDEX IF NOT EXISTS idx_ia_conv_usuario ON ia_conversaciones(usuario_id)`,
   `CREATE INDEX IF NOT EXISTS idx_compra_hist_compra ON compra_historial(compra_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_tienda_pedidos_estado ON tienda_pedidos(estado_entrega)`,
+  `CREATE INDEX IF NOT EXISTS idx_tienda_meta_oferta ON tienda_producto_meta(oferta_del_dia)`,
 ];
 
 // Etapas por defecto del kanban (se siembran solo si la tabla está vacía)

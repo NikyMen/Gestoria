@@ -23,6 +23,16 @@ export const productos = sqliteTable("productos", {
   creadoEn: integer("creado_en", { mode: "timestamp" }).default(now),
 });
 
+// Metadatos visuales de la tienda: no alteran el stock ni los datos contables.
+export const tiendaProductoMeta = sqliteTable("tienda_producto_meta", {
+  productoId: integer("producto_id")
+    .primaryKey()
+    .references(() => productos.id),
+  precioAnterior: real("precio_anterior"),
+  badge: text("badge").default(""),
+  ofertaDelDia: integer("oferta_del_dia", { mode: "boolean" }).notNull().default(false),
+});
+
 // ---------------------------------------------------------------------------
 // Clientes
 // ---------------------------------------------------------------------------
@@ -50,6 +60,31 @@ export const ventas = sqliteTable("ventas", {
   referencia: text("referencia").notNull().default(""),
   facturada: integer("facturada", { mode: "boolean" }).notNull().default(false),
   fecha: integer("fecha", { mode: "timestamp" }).default(now),
+});
+
+// Datos propios del checkout público, vinculados a la venta existente.
+export const tiendaPedidos = sqliteTable("tienda_pedidos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  ventaId: integer("venta_id")
+    .notNull()
+    .unique()
+    .references(() => ventas.id),
+  checkoutId: text("checkout_id").notNull().unique(),
+  nombre: text("nombre").notNull().default(""),
+  telefono: text("telefono").notNull().default(""),
+  direccion: text("direccion").notNull().default(""),
+  franjaEntrega: text("franja_entrega").notNull().default(""),
+  fechaEntrega: text("fecha_entrega").notNull().default(""),
+  lat: real("lat"),
+  lng: real("lng"),
+  estadoEntrega: text("estado_entrega").notNull().default("pendiente"),
+  codigoEntrega: text("codigo_entrega").notNull().default(""),
+  preferenciaMp: text("preferencia_mp").notNull().default(""),
+  initPointMp: text("init_point_mp").notNull().default(""),
+  pagoMp: text("pago_mp").notNull().default(""),
+  notas: text("notas").notNull().default(""),
+  creadoEn: integer("creado_en", { mode: "timestamp" }).default(now),
+  actualizadoEn: integer("actualizado_en", { mode: "timestamp" }).default(now),
 });
 
 export const ventaItems = sqliteTable("venta_items", {
@@ -217,6 +252,8 @@ export const iaMensajes = sqliteTable("ia_mensajes", {
 });
 
 export type Producto = typeof productos.$inferSelect;
+export type TiendaProductoMeta = typeof tiendaProductoMeta.$inferSelect;
+export type TiendaPedido = typeof tiendaPedidos.$inferSelect;
 export type IaConversacion = typeof iaConversaciones.$inferSelect;
 export type IaMensaje = typeof iaMensajes.$inferSelect;
 export type Cliente = typeof clientes.$inferSelect;

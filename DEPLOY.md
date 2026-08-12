@@ -37,6 +37,11 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 nano .env
 
+# En producción, el bloque de IA debe contener:
+# DEEPSEEK_API_KEY=tu_clave_deepseek
+# DEEPSEEK_MODEL=deepseek-v4-flash
+# No hace falta instalar otro SDK ni configurar MongoDB/PostgreSQL para GestorIA.
+
 # Crear el schema y sembrar datos iniciales (usuarios, etapas, etc.)
 pnpm db:setup
 
@@ -55,11 +60,14 @@ La app queda en `http://127.0.0.1:3300` (el puerto lo fija `ecosystem.config.cjs
 
 ```bash
 cd /opt/gestoria
+pm2 stop gestoria
+cp gestoria.db "gestoria.db.backup-$(date +%Y%m%d-%H%M%S)"
+cp .env ".env.backup-$(date +%Y%m%d-%H%M%S)"
 git pull
 pnpm install --frozen-lockfile
 pnpm db:push        # solo si cambió el schema (es idempotente: no rompe nada)
 pnpm build
-pm2 reload gestoria
+pm2 start ecosystem.config.cjs --only gestoria
 ```
 
 > `db:push` solo crea lo que falta (`CREATE TABLE IF NOT EXISTS` + `ALTER`

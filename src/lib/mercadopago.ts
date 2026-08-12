@@ -47,9 +47,9 @@ export async function crearPreferencia(opts: {
     })),
     external_reference: String(opts.ventaId),
     back_urls: {
-      success: `${base}/store/exito`,
-      pending: `${base}/store/pendiente`,
-      failure: `${base}/store/error`,
+      success: `${base}/tienda/checkout/resultado?status=approved`,
+      pending: `${base}/tienda/checkout/resultado?status=pending`,
+      failure: `${base}/tienda/checkout/resultado?status=rejected`,
     },
     notification_url: `${base}/api/mp/webhook`,
   };

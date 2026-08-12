@@ -1,6 +1,6 @@
 "use server";
 
-import { db, productos, clientes, compras, ventas, ventaItems } from "@/db";
+import { db, productos, clientes, compras, ventas, ventaItems, tiendaProductoMeta } from "@/db";
 import { eq, sql, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { descontarStock } from "@/lib/stock";
@@ -69,6 +69,18 @@ export async function togglePublicado(id: number) {
     .set({ publicado: sql`not ${productos.publicado}` })
     .where(eq(productos.id, id));
   revalidatePath("/tienda");
+  revalidatePath("/stock");
+}
+
+export async function toggleOfertaTienda(id: number) {
+  const [meta] = await db.select().from(tiendaProductoMeta).where(eq(tiendaProductoMeta.productoId, id)).limit(1);
+  if (meta) {
+    await db.update(tiendaProductoMeta).set({ ofertaDelDia: !meta.ofertaDelDia }).where(eq(tiendaProductoMeta.productoId, id));
+  } else {
+    await db.insert(tiendaProductoMeta).values({ productoId: id, ofertaDelDia: true });
+  }
+  revalidatePath("/tienda");
+  revalidatePath("/tienda/ofertas");
   revalidatePath("/stock");
 }
 
