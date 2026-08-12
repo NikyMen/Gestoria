@@ -4,11 +4,11 @@ import Link from "next/link";
 import { CheckCircle2, Clock3, XCircle } from "lucide-react";
 import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useTiendaCart } from "@/store/tienda-cart";
+import { useCart } from "@/store/cart";
 
 function ResultadoContenido() {
   const params = useSearchParams();
-  const clear = useTiendaCart((state) => state.clear);
+  const clear = useCart((state) => state.clear);
   const status = params.get("status") || params.get("collection_status") || "pending";
   const approved = status === "approved";
   const rejected = status === "rejected" || status === "cancelled";

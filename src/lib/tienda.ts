@@ -1,5 +1,6 @@
 import { and, asc, eq, like, or } from "drizzle-orm";
 import { db, productos, tiendaProductoMeta } from "@/db";
+import type { Product, SuperOferta } from "@/lib/types";
 
 export type TiendaProducto = {
   id: string;
@@ -84,4 +85,19 @@ export async function getTiendaProducto(id: number): Promise<TiendaProducto | nu
 
 export async function listTiendaOfertas(): Promise<TiendaProducto[]> {
   return listTiendaProductos({ ofertas: true });
+}
+
+function categoryForStore(category: string): Product["category"] {
+  const value = category.toLowerCase();
+  if (value.includes("reboz") || value.includes("congel") || value.includes("medall") || value.includes("croq")) return "rebozados";
+  if (value.includes("caj") || value.includes("caja")) return "cajones";
+  return "cortes";
+}
+
+export function tiendaToStoreProduct(product: TiendaProducto): Product {
+  return { id: product.id, name: product.name, description: product.description, price: product.price, oldPrice: product.oldPrice, category: categoryForStore(product.category), image: product.image, badge: product.badge, dailyOffer: product.dailyOffer, available: product.available, stock: product.stock };
+}
+
+export function tiendaToSuperOferta(product: TiendaProducto): SuperOferta {
+  return { id: `tienda-${product.id}`, title: product.name, subtitle: product.description || "Oferta publicada desde GestorIA", price: product.price, oldPrice: product.oldPrice, image: product.image, cartProductId: product.id, cartQuantity: 1, link: "/tienda/ofertas", active: true };
 }

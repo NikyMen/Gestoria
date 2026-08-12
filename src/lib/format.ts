@@ -6,6 +6,8 @@ export function money(n: number): string {
   }).format(n || 0);
 }
 
+export const formatARS = money;
+
 export function fecha(d: Date | number | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "number" ? new Date(d * 1000) : d;

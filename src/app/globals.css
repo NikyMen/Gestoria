@@ -19,6 +19,9 @@
   --color-brand-dark: #940d23;
   --color-brand-gold: #f6b40a;
   --color-brand-cream: #f8f3e9;
+  --shadow-soft: 0 8px 24px rgb(23 23 23 / 0.08);
+  --shadow-card: 0 14px 32px rgb(23 23 23 / 0.14);
+  --radius-xl2: 1.25rem;
 
   --font-sans: var(--font-inter), system-ui, "Segoe UI", Arial, sans-serif;
   --font-display: var(--font-poppins), system-ui, sans-serif;

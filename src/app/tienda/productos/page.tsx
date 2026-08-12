@@ -1,10 +1,10 @@
-import { listTiendaProductos } from "@/lib/tienda";
-import { TiendaProductGrid } from "@/components/tienda/StoreShell";
+import { listTiendaProductos, tiendaToStoreProduct } from "@/lib/tienda";
+import { ProductCatalog } from "@/components/store/ProductCatalog";
 
 export const dynamic = "force-dynamic";
 
 export default async function TiendaProductosPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
-  const products = await listTiendaProductos({ search: q });
-  return <div className="space-y-5 px-4 py-6 md:px-6 md:py-10"><div><p className="text-xs font-bold uppercase tracking-wide text-brand-red">Catálogo</p><h1 className="mt-1 text-3xl font-black">{q ? `Resultados para “${q}”` : "Todos los productos"}</h1></div><TiendaProductGrid products={products} /></div>;
+  const products = (await listTiendaProductos()).map(tiendaToStoreProduct);
+  return <div className="space-y-4 px-4 pt-4 md:px-6 md:pt-8"><h1 className="text-lg font-bold text-brand-ink md:text-3xl">{q ? `Resultados para “${q}”` : "Nuestros Productos"}</h1><ProductCatalog products={products} query={q} /></div>;
 }
