@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  AlertTriangle,
-  Clock,
   Loader2,
-  MapPin,
   Minus,
   Plus,
   ShoppingBag,
@@ -16,15 +13,9 @@ import {
 import { useCart } from "@/store/cart";
 import { useUI } from "@/store/ui";
 import { formatARS } from "@/lib/format";
-import { isInsideCorrientes, MIN_ENVIO_TOTAL } from "@/lib/geo";
-import {
-  AVISO_DIRECCION,
-  estimatedDeliveryOptions,
-} from "@/lib/entrega";
-import { MapPicker, type MapPoint } from "@/components/store/MapPicker";
 import type { CouponQuote } from "@/lib/types";
 
-const CHECKOUT_ATTEMPT_KEY = "entrerios-checkout-attempt";
+const CHECKOUT_ATTEMPT_KEY = "gestoria-checkout-attempt";
 
 export function CartDrawer() {
   const open = useUI((s) => s.cartOpen);
@@ -42,28 +33,10 @@ export function CartDrawer() {
   const [pagando, setPagando] = useState(false);
   const checkoutAttempt = useRef<{ fingerprint: string; id: string } | null>(null);
 
-  // Datos de contacto + entrega a domicilio (única modalidad).
+  // Datos mínimos para registrar al cliente y coordinar la entrega.
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
-  const [punto, setPunto] = useState<MapPoint | null>(null);
-  const [puntoConfirmado, setPuntoConfirmado] = useState(false);
-  const [opcionEntregaKey, setOpcionEntregaKey] = useState("");
-  const [ahora, setAhora] = useState(() => new Date());
-  const opcionesEntrega = useMemo(() => estimatedDeliveryOptions(ahora), [ahora]);
-  const opcionEntregaSeleccionada = useMemo(
-    () => opcionesEntrega.find((opcion) => opcion.key === opcionEntregaKey) ?? null,
-    [opcionEntregaKey, opcionesEntrega]
-  );
-
-  // Mantiene las fechas visibles actualizadas si el carrito queda abierto al
-  // cruzar uno de los cortes (12:00 o 21:00, hora Argentina).
-  useEffect(() => {
-    if (!open) return;
-    setAhora(new Date());
-    const timer = window.setInterval(() => setAhora(new Date()), 30_000);
-    return () => window.clearInterval(timer);
-  }, [open]);
 
   useEffect(() => {
     setCoupon(null);
@@ -87,11 +60,6 @@ export function CartDrawer() {
       cancelled = true;
     };
   }, [lines]);
-
-  // Si el cliente mueve el pin, tiene que volver a confirmar la ubicación.
-  useEffect(() => {
-    setPuntoConfirmado(false);
-  }, [punto?.lat, punto?.lng]);
 
   const applyCoupon = async () => {
     if (!couponCode.trim() || validatingCoupon) return;
@@ -125,63 +93,26 @@ export function CartDrawer() {
   const nombreValido = nombre.trim().length >= 2;
   const telefonoValido = telefono.replace(/\D/g, "").length >= 6;
   const direccionValida = direccion.trim().length >= 4;
-  const dentroDeZona = punto !== null && isInsideCorrientes(punto.lat, punto.lng);
-  const alcanzaMinimo = subtotal >= MIN_ENVIO_TOTAL;
-  const faltaParaMinimo = Math.max(0, MIN_ENVIO_TOTAL - subtotal);
-
-  const listoParaPagar =
-    nombreValido &&
-    telefonoValido &&
-    alcanzaMinimo &&
-    direccionValida &&
-    punto !== null &&
-    dentroDeZona &&
-    puntoConfirmado &&
-    opcionEntregaSeleccionada !== null;
+  const listoParaPagar = nombreValido && telefonoValido && direccionValida;
 
   const textoBoton = pagando
     ? "Redirigiendo a Mercado Pago…"
-    : !alcanzaMinimo
-      ? `Mínimo ${formatARS(MIN_ENVIO_TOTAL)} para comprar`
-      : !nombreValido || !telefonoValido
-        ? "Completá tus datos"
-        : !direccionValida || !punto
-          ? "Completá dirección y mapa"
-          : !dentroDeZona
-            ? "Punto fuera de Corrientes"
-            : !puntoConfirmado
-              ? "Confirmá la ubicación del mapa"
-              : opcionEntregaSeleccionada === null
-                ? "Elegí el horario de entrega"
-                : "Pagar con Mercado Pago";
+    : !nombreValido || !telefonoValido || !direccionValida
+      ? "Completá tus datos"
+      : "Pagar con Mercado Pago";
 
   // Inicia el pago: crea el pedido + preferencia en el backend y redirige a MP.
   const pagarConMercadoPago = async () => {
-    if (!listoParaPagar || pagando || !opcionEntregaSeleccionada) return;
+    if (!listoParaPagar || pagando) return;
     setErrorPago(null);
     setPagando(true);
     try {
-      // Se vuelve a calcular al hacer click para no enviar una fecha vencida si
-      // justo se alcanzó un horario de corte con el carrito abierto.
-      const ahoraActualizado = new Date();
-      const opcionEntrega = estimatedDeliveryOptions(ahoraActualizado).find(
-        (opcion) => opcion.key === opcionEntregaKey
-      );
-      if (!opcionEntrega) {
-        setAhora(ahoraActualizado);
-        setOpcionEntregaKey("");
-        throw new Error("La fecha de entrega se actualizó. Elegí nuevamente el horario.");
-      }
       const payload = {
         items: lines.map((l) => ({
           productoId: Number(l.product.id),
           cantidad: l.qty,
         })),
         direccion: direccion.trim(),
-        lat: punto?.lat,
-        lng: punto?.lng,
-        franjaEntrega: opcionEntrega.id,
-        fechaEntrega: opcionEntrega.date,
         nombre: nombre.trim(),
         telefono: telefono.trim(),
         couponCode: coupon?.code,
@@ -347,13 +278,6 @@ export function CartDrawer() {
             </div>
 
             <div className="mt-3 space-y-3">
-              {!alcanzaMinimo && (
-                <p className="rounded-lg bg-brand-gold/20 px-3 py-2 text-xs font-bold text-brand-ink">
-                  La compra mínima es de {formatARS(MIN_ENVIO_TOTAL)}. Te faltan{" "}
-                  {formatARS(faltaParaMinimo)}.
-                </p>
-              )}
-
               <div className="space-y-3 rounded-2xl border border-black/5 bg-brand-cream/60 p-3">
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
@@ -376,13 +300,12 @@ export function CartDrawer() {
                       type="tel"
                       value={telefono}
                       onChange={(e) => setTelefono(e.target.value)}
-                      placeholder="3794 ..."
+                      placeholder="Tu número"
                       className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm"
                     />
                   </label>
                 </div>
 
-                {/* Paso: dirección (solo calle y altura) */}
                 <div>
                   <label className="block">
                     <span className="mb-1 block text-xs font-semibold text-brand-ink/70">
@@ -392,55 +315,9 @@ export function CartDrawer() {
                       type="text"
                       value={direccion}
                       onChange={(e) => setDireccion(e.target.value)}
-                      placeholder="Ej: Blas Parera 1749"
+                      placeholder="Calle, altura y localidad"
                       className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm"
                     />
-                  </label>
-                  <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-brand-red/10 px-3 py-2 text-xs font-semibold text-brand-red">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                    <span>{AVISO_DIRECCION}</span>
-                  </p>
-                </div>
-
-                {/* Paso: rango horario de entrega */}
-                <div>
-                  <span className="mb-1 flex items-center gap-1 text-xs font-semibold text-brand-ink/70">
-                    <Clock size={14} className="text-brand-red" /> ¿En qué horario querés recibirlo?
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {opcionesEntrega.map((opcion) => (
-                      <button
-                        key={opcion.key}
-                        type="button"
-                        onClick={() => setOpcionEntregaKey(opcion.key)}
-                        aria-pressed={opcionEntregaKey === opcion.key}
-                        className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition ${
-                          opcionEntregaKey === opcion.key
-                            ? "border-brand-red bg-brand-red text-white"
-                            : "border-black/10 bg-white text-brand-ink hover:border-brand-red/40"
-                        }`}
-                      >
-                        {opcion.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Paso: mapa + confirmación de la ubicación (versión compacta) */}
-                <div>
-                  <span className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-brand-ink/70">
-                    <MapPin size={13} className="text-brand-red" /> Marcá el punto exacto en el mapa
-                  </span>
-                  <MapPicker value={punto} onChange={setPunto} searchQuery={direccion} compact />
-                  <label className="mt-2 flex items-start gap-2 rounded-lg bg-brand-gold/20 px-3 py-1.5 text-[11px] font-bold text-brand-ink">
-                    <input
-                      type="checkbox"
-                      checked={puntoConfirmado}
-                      disabled={!punto}
-                      onChange={(e) => setPuntoConfirmado(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-brand-red disabled:opacity-40"
-                    />
-                    <span>Confirmo que la ubicación marcada en el mapa es la correcta.</span>
                   </label>
                 </div>
               </div>

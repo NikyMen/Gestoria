@@ -61,6 +61,6 @@ export const useCart = create<CartState>()(
       count: () => get().lines.reduce((acc, l) => acc + l.qty, 0),
       total: () => get().lines.reduce((acc, l) => acc + l.qty * l.product.price, 0),
     }),
-    { name: "entrerios-cart" }
+    { name: "gestoria-store-cart" }
   )
 );

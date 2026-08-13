@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { X, Home, UtensilsCrossed, Tag, User, MapPin, Phone } from "lucide-react";
+import { X, Home, PackageSearch, Tag, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useUI } from "@/store/ui";
-import { WHATSAPP_VISIBLE } from "@/lib/whatsapp";
 
 const links = [
   { href: "/tienda", label: "Inicio", icon: Home },
-  { href: "/tienda/productos", label: "Productos", icon: UtensilsCrossed },
+  { href: "/tienda/productos", label: "Productos", icon: PackageSearch },
   { href: "/tienda/ofertas", label: "Ofertas", icon: Tag },
-  { href: "/tienda/sucursales", label: "Sucursales", icon: MapPin },
 ];
 
 export function SideMenu() {
@@ -49,15 +47,10 @@ export function SideMenu() {
             </Link>
           ))}
         </nav>
-        <div className="space-y-2 border-t border-black/5 px-4 py-4 text-sm text-brand-ink/70">
-          <p className="flex items-center gap-2">
-            <MapPin size={16} className="text-brand-red" /> Junin 2198, Corrientes
-          </p>
-          <p className="flex items-center gap-2">
-            <MapPin size={16} className="text-brand-red" /> Sarmiento y La Pampa
-          </p>
-          <p className="flex items-center gap-2">
-            <Phone size={16} className="text-brand-red" /> Consultas: WhatsApp {WHATSAPP_VISIBLE}
+        <div className="border-t border-black/5 px-4 py-4 text-sm text-brand-ink/70">
+          <p className="flex items-start gap-2">
+            <ShieldCheck size={17} className="mt-0.5 shrink-0 text-brand-red" />
+            Precios y stock sincronizados directamente con GestorIA.
           </p>
         </div>
       </aside>

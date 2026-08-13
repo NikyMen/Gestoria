@@ -84,6 +84,17 @@ h1, h2, h3, .font-display {
   @apply w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand-red focus:ring-2 focus:ring-brand-red/15;
 }
 
+/* La tienda pública usa exclusivamente la identidad de Consultoría Digital. */
+.gestoria-store {
+  --color-brand-red: #0c1015;
+  --color-brand-dark: #080b0f;
+  --color-brand-gold: #c5ed1b;
+  --color-brand-cream: #f5f7f0;
+  --color-brand-ink: #0c1015;
+  --shadow-soft: 0 8px 24px rgb(12 16 21 / 0.08);
+  --shadow-card: 0 14px 32px rgb(12 16 21 / 0.16);
+}
+
 /* Tecla del atajo, en el modal de cobro */
 @utility kbd {
   @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-slate-300 bg-slate-50 px-1 font-mono text-[11px] font-semibold text-slate-500;

@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, UtensilsCrossed, Tag, MapPin, User } from "lucide-react";
+import { Home, PackageSearch, Tag } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const items = [
   { href: "/tienda", label: "Inicio", icon: Home },
-  { href: "/tienda/productos", label: "Productos", icon: UtensilsCrossed },
+  { href: "/tienda/productos", label: "Productos", icon: PackageSearch },
   { href: "/tienda/ofertas", label: "Ofertas", icon: Tag },
-  { href: "/tienda/sucursales", label: "Sucursales", icon: MapPin },
 ];
 
 export function BottomNav() {

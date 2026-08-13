@@ -1,4 +1,4 @@
-export type Category = "cortes" | "cajones" | "rebozados";
+export type Category = string;
 
 /** Posteo/banner de la sección "Novedades" de la home. */
 export interface Novedad {

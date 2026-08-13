@@ -24,6 +24,7 @@ function datosProducto(fd: FormData) {
     precioCompra: Number(fd.get("precioCompra") || 0),
     stock: Number(fd.get("stock") || 0),
     stockMinimo: Number(fd.get("stockMinimo") || 5),
+    imagen: String(fd.get("imagen") || "").trim(),
   };
 }
 
@@ -46,6 +47,7 @@ export async function editarProducto(id: number, formData: FormData) {
   revalidatePath("/stock");
   revalidatePath("/");
   revalidatePath("/tienda");
+  revalidatePath("/tienda/productos");
 }
 
 export async function eliminarProducto(id: number) {

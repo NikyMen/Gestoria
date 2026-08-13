@@ -79,7 +79,7 @@ function CartToast({ toast }: { toast: Toast }) {
           <ShoppingCart size={20} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold leading-tight text-brand-ink">¡Listo! Ya está en tu pedido 🍗</p>
+          <p className="text-sm font-bold leading-tight text-brand-ink">¡Listo! Ya está en tu pedido</p>
           <p className="truncate text-xs text-brand-ink/60">{toast.message}</p>
         </div>
         <button

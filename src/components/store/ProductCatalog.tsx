@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { Product } from "@/lib/types";
-import { categories } from "@/lib/data";
 import { ProductCard } from "@/components/store/ProductCard";
 import { cn } from "@/lib/cn";
 
@@ -14,6 +13,12 @@ export function ProductCatalog({ products, query }: { products: Product[]; query
         (p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
       )
     : products;
+  const categories = [
+    { id: "todos", label: "Todos" },
+    ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, "es"))
+      .map((category) => ({ id: category, label: category })),
+  ];
   const list = cat === "todos" ? searched : searched.filter((p) => p.category === cat);
 
   return (

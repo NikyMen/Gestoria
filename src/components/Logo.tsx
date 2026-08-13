@@ -1,37 +1,19 @@
 import Image from "next/image";
 import { cn } from "@/lib/cn";
 
-/** Logo "Pollería Entre Ríos" (imagen en /public/logo.jpg). */
-export function Logo({ className, dark = false }: { className?: string; dark?: boolean }) {
+/** Logo oficial de Consultoría Digital, recortado visualmente sin duplicar el asset. */
+export function Logo({ className }: { className?: string; dark?: boolean }) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("relative h-10 w-[212px] overflow-hidden rounded-lg bg-brand-ink", className)}>
       <Image
-        src="/logo.jpg"
-        alt="Pollería Entre Ríos"
-        width={48}
-        height={48}
+        src="/brand/logo-cd.webp"
+        alt="Consultoría Digital"
+        width={600}
+        height={400}
         priority
         unoptimized
-        className="h-12 w-12 rounded-full object-cover"
+        className="absolute left-2 top-1/2 h-auto w-[calc(100%-1rem)] -translate-y-1/2"
       />
-      <div className="flex flex-col leading-none">
-        <span
-          className={cn(
-            "text-[10px] font-bold uppercase tracking-[0.25em]",
-            dark ? "text-white/70" : "text-brand-gold"
-          )}
-        >
-          Pollería
-        </span>
-        <span
-          className={cn(
-            "font-display text-xl font-bold italic",
-            dark ? "text-white" : "text-brand-red"
-          )}
-        >
-          Entre Ríos
-        </span>
-      </div>
     </div>
   );
 }

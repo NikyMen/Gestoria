@@ -14,7 +14,6 @@ const navLinks = [
   { href: "/tienda", label: "Inicio" },
   { href: "/tienda/productos", label: "Productos" },
   { href: "/tienda/ofertas", label: "Ofertas" },
-  { href: "/tienda/sucursales", label: "Sucursales" },
 ];
 
 export function StoreHeader() {
@@ -35,7 +34,7 @@ export function StoreHeader() {
           <Menu size={24} />
         </button>
 
-        <Link href="/tienda" aria-label="Inicio">
+        <Link href="/tienda" aria-label="Inicio de la tienda Consultoría Digital">
           <Logo />
         </Link>
 

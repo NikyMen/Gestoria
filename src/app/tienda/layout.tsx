@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { BottomNav } from "@/components/store/BottomNav";
@@ -8,9 +9,14 @@ import { VisitTracker } from "@/components/store/VisitTracker";
 import { Toaster } from "@/components/store/Toaster";
 import { FloatingActions } from "@/components/store/FloatingActions";
 
+export const metadata: Metadata = {
+  title: "Tienda online · Consultoría Digital",
+  description: "Comprá online los productos publicados desde GestorIA, con stock y precios actualizados.",
+};
+
 export default function TiendaLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-brand-cream">
+    <div className="gestoria-store flex min-h-screen flex-col bg-brand-cream">
       <VisitTracker />
       <StoreHeader />
       <main className="flex-1 pb-20 md:pb-12"><div className="mx-auto w-full max-w-6xl">{children}</div></main>

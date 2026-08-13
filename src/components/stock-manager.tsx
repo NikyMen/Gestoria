@@ -142,6 +142,7 @@ function CamposProducto({ p }: { p?: Producto }) {
         <div><label className="label">Stock</label><input name="stock" type="number" className="input" defaultValue={p?.stock ?? 0} /></div>
         <div><label className="label">Mínimo</label><input name="stockMinimo" type="number" className="input" defaultValue={p?.stockMinimo ?? 5} /></div>
       </div>
+      <div className="md:col-span-3"><label className="label">Imagen para la tienda</label><input name="imagen" className="input" defaultValue={p?.imagen ?? ""} placeholder="https://... o /uploads/..." /></div>
     </div>
   );
 }
