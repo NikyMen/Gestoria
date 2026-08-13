@@ -84,6 +84,15 @@ function SidebarContent({
       </nav>
 
       <div className="mt-auto space-y-3 pt-6">
+        <Link
+          href="/tienda"
+          onClick={onNavigate}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white md:py-2"
+        >
+          <Store className="h-4 w-4 shrink-0" />
+          Ver tienda
+        </Link>
+
         <button
           onClick={onConfig}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white md:py-2"
