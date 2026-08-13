@@ -18,11 +18,9 @@ import {
   UserCog,
   ReceiptText,
   Sparkles,
-  Menu,
   type LucideIcon,
 } from "lucide-react";
 import { tieneAcceso, MODULOS_VISIBLES, type ModuloKey, type UsuarioActual } from "@/lib/permisos";
-import { useNav } from "@/components/nav-context";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 
 const ICONOS: Record<ModuloKey, LucideIcon> = {
@@ -47,7 +45,6 @@ const DERECHA: ModuloKey[] = ["ventas", "compras", "stock", "facturacion"];
 export function BottomNav({ usuario }: { usuario: UsuarioActual }) {
   const path = usePathname();
   const router = useRouter();
-  const { menuAbierto, setMenuAbierto } = useNav();
   const [escaneando, setEscaneando] = useState(false);
 
   function elegir(prefs: ModuloKey[], usados: Set<ModuloKey>, cantidad: number) {
@@ -107,17 +104,6 @@ export function BottomNav({ usuario }: { usuario: UsuarioActual }) {
             <ItemNav key={k} modulo={k} path={path} />
           ))}
 
-          <button
-            onClick={() => setMenuAbierto(!menuAbierto)}
-            className={`flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition ${
-              menuAbierto ? "text-navy" : "text-slate-500"
-            }`}
-            aria-expanded={menuAbierto}
-            aria-label="Abrir menú"
-          >
-            <Menu className="h-5 w-5" />
-            Menú
-          </button>
         </div>
       </nav>
 

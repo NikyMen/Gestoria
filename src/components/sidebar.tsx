@@ -19,6 +19,7 @@ import {
   Store,
   Sparkles,
   MessageCircle,
+  Menu,
   LogOut,
   Settings,
   X,
@@ -137,6 +138,14 @@ export function Sidebar({ usuario }: { usuario: UsuarioActual }) {
     <>
       {/* Barra superior compacta en móvil: la navegación vive abajo */}
       <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-white/10 bg-navy px-4 py-2.5 text-slate-300 md:hidden">
+        <button
+          onClick={() => setMenuAbierto(!menuAbierto)}
+          className="rounded-lg p-1.5 text-slate-300 transition hover:bg-white/10 hover:text-white"
+          aria-expanded={menuAbierto}
+          aria-label="Abrir menú"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <Image src="/brand/logo-cd.webp" alt="" width={90} height={60} className="h-6 w-auto" priority />
         <span className="text-sm font-semibold tracking-wide text-lime">GestorIA</span>
       </header>

@@ -34,11 +34,18 @@ export function CajaPOS({ productos }: { productos: Producto[] }) {
 
   const filtrados = buscar(busqueda);
 
+  useEffect(() => {
+    // El foco automático es útil con teclado/lector USB, pero abre el teclado
+    // virtual al entrar a Caja desde un celular.
+    if (window.matchMedia("(min-width: 768px)").matches) inputRef.current?.focus();
+  }, []);
+
   const porCodigo = useCallback(
     (codigo: string) => {
       setTicket(null);
       agregarPorCodigo(codigo);
       setBusqueda("");
+      setPedidoAbierto(true);
     },
     [agregarPorCodigo]
   );
@@ -95,7 +102,7 @@ export function CajaPOS({ productos }: { productos: Producto[] }) {
       setBusqueda("");
       setEligiendoPago(false);
       setPedidoAbierto(false);
-      inputRef.current?.focus();
+      if (window.matchMedia("(min-width: 768px)").matches) inputRef.current?.focus();
     });
   }
 
@@ -168,6 +175,13 @@ export function CajaPOS({ productos }: { productos: Producto[] }) {
             </button>
           )}
         </div>
+        <button
+          className="btn-ghost mt-2 w-full justify-center lg:hidden"
+          onClick={() => { setPedidoAbierto(false); setEscaneando(true); }}
+        >
+          <Camera className="h-4 w-4" />
+          Escanear otro producto
+        </button>
       </div>
     </>
   );
@@ -181,7 +195,6 @@ export function CajaPOS({ productos }: { productos: Producto[] }) {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               ref={inputRef}
-              autoFocus
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               onKeyDown={onSearchKey}
@@ -225,7 +238,7 @@ export function CajaPOS({ productos }: { productos: Producto[] }) {
 
         {/* auto-rows-fr + mt-auto en el pie: el precio queda SIEMPRE abajo a la
             derecha, sin importar si el nombre ocupa una o dos líneas. */}
-        <div className="grid max-h-[58vh] auto-rows-fr grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
+        <div className="grid max-h-[58vh] auto-rows-fr grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
           {filtrados.map((p) => {
             const usado = enCarrito.get(p.id) ?? 0;
             const restante = p.stock - usado;
@@ -235,7 +248,7 @@ export function CajaPOS({ productos }: { productos: Producto[] }) {
                 key={p.id}
                 onClick={() => { setTicket(null); agregar(p); }}
                 disabled={agotado}
-                className="flex h-full flex-col rounded-xl border border-slate-200 bg-white/70 p-3 text-left transition hover:border-lime hover:bg-lime/5 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-full min-w-0 flex-col rounded-xl border border-slate-200 bg-white/70 p-3 text-left transition hover:border-lime hover:bg-lime/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <span className="line-clamp-2 text-sm font-medium leading-tight">{p.nombre}</span>
                 <span className="mt-1 font-mono text-[11px] text-slate-400">{p.sku}</span>
